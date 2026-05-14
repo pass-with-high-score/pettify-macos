@@ -76,6 +76,9 @@ type model struct {
 	err            error
 	initialized    bool
 	width          int
+	pointA         int
+	pointB         int
+	abActive       bool
 }
 
 type tickMsg time.Time
@@ -275,6 +278,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.streamer = msg.streamer
 		m.format = msg.format
+		m.abActive = false // Reset AB on new song
 		
 		m.ctrl = &beep.Ctrl{Streamer: m.streamer, Paused: false}
 		m.volume = &effects.Volume{Streamer: m.ctrl, Base: 2, Volume: 0, Silent: false}
@@ -343,11 +347,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				speaker.Unlock()
 			}
+		case "[": // Mark A
+			if m.streamer != nil {
+				m.pointA = m.streamer.Position()
+				m.abActive = false // Wait for B
+			}
+		case "]": // Mark B
+			if m.streamer != nil {
+				pos := m.streamer.Position()
+				if pos > m.pointA {
+					m.pointB = pos
+					m.abActive = true
+				}
+			}
+		case "\\": // Clear AB
+			m.abActive = false
 		}
 
 	case tickMsg:
 		if m.quitting {
 			return m, nil
+		}
+		if m.abActive && m.streamer != nil {
+			if m.streamer.Position() >= m.pointB {
+				speaker.Lock()
+				m.streamer.Seek(m.pointA)
+				speaker.Unlock()
+			}
 		}
 		if m.streamer != nil && m.streamer.Position() >= m.streamer.Len() {
 			return m.nextSong()
@@ -435,8 +461,12 @@ func (m model) View() string {
 		}
 
 		statusInfo := fmt.Sprintf("%s  %s / %s %s %s", status, elapsed, total, modeInfo, volInfo)
-		s += statusStyle.Render(statusInfo) + "\n"
-	} else {
+		if m.abActive {
+			aTime := m.format.SampleRate.D(m.pointA).Round(time.Second)
+			bTime := m.format.SampleRate.D(m.pointB).Round(time.Second)
+			statusInfo += fmt.Sprintf(" [A-B: %s-%s]", aTime, bTime)
+		}
+		s += statusStyle.Render(statusInfo) + "\n"	} else {
 		s += "No tracks found matching search.\n\n"
 	}
 
@@ -463,7 +493,7 @@ func (m model) View() string {
 		}
 	}
 
-	s += helpStyle.Render("Space: Pause • N/P: Next/Prev • J/K: Seek • Up/Down: Vol • /: Search • Q: Quit") + "\n"
+	s += helpStyle.Render("Space: Pause • N/P: Next/Prev • J/K: Seek • Up/Down: Vol • []: A-B • \\: Clear • /: Search • Q: Quit") + "\n"
 
 	return s
 }

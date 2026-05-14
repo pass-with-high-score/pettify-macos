@@ -6,6 +6,7 @@ A clean, professional Terminal User Interface (TUI) music player for macOS writt
 
 - **Multi-format Support**: Plays `.mp3`, `.wav`, `.ogg`, and `.flac`.
 - **Clean TUI**: Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lip Gloss](https://github.com/charmbracelet/lipgloss).
+- **A-B Repeat**: Mark start (`[`) and end (`]`) points to loop a specific segment.
 - **Metadata Support**: Displays Artist and Title from ID3 tags.
 - **Playlist Management**: Support for folder playback, shuffle, and loop modes.
 - **Search**: Instant filtering of your playlist with `/`.
@@ -14,6 +15,8 @@ A clean, professional Terminal User Interface (TUI) music player for macOS writt
     - `N` / `P`: Next/Previous track
     - `J` / `K`: Seek backward/forward 10s
     - `Up` / `Down`: Volume control
+    - `[` / `]`: Set A-B Repeat points
+    - `\`: Clear A-B Repeat
     - `/`: Search playlist
     - `L` / `S`: Toggle Loop/Shuffle
     - `Q`: Quit
