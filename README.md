@@ -13,7 +13,7 @@ A clean, professional Terminal User Interface (TUI) music player for macOS writt
 - **Advanced Controls**:
     - `Space`: Play/Pause
     - `N` / `P`: Next/Previous track
-    - `J` / `K`: Seek backward/forward 10s
+    - `Left` / `Right`: Seek backward/forward 10s
     - `Up` / `Down`: Volume control
     - `[` / `]`: Set A-B Repeat points
     - `\`: Clear A-B Repeat

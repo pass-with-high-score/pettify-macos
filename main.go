@@ -307,9 +307,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.ctrl.Paused = !m.ctrl.Paused
 				speaker.Unlock()
 			}
-		case "n", "right":
+		case "n":
 			return m.nextSong()
-		case "p", "left":
+		case "p":
 			return m.prevSong()
 		case "l":
 			m.loop = !m.loop
@@ -327,7 +327,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.volume.Volume -= 0.1
 				speaker.Unlock()
 			}
-		case "j": // Back 10s
+		case "j", "left": // Back 10s
 			if m.streamer != nil {
 				speaker.Lock()
 				newPos := m.streamer.Position() - m.format.SampleRate.N(time.Second*10)
@@ -337,7 +337,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.streamer.Seek(newPos)
 				speaker.Unlock()
 			}
-		case "k": // Forward 10s
+		case "k", "right": // Forward 10s
 			if m.streamer != nil {
 				speaker.Lock()
 				newPos := m.streamer.Position() + m.format.SampleRate.N(time.Second*10)
@@ -376,7 +376,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		if m.streamer != nil && m.streamer.Position() >= m.streamer.Len() {
-			return m.nextSong()
+			nm, cmd := m.nextSong()
+			if nm.quitting {
+				return nm, cmd
+			}
+			return nm, cmd
 		}
 		return m, tick()
 
@@ -398,8 +402,14 @@ func (m model) nextSong() (model, tea.Cmd) {
 		if m.loop {
 			m.currentIndex = 0
 		} else {
-			m.quitting = true
-			return m, tea.Quit
+			m.currentIndex = len(m.filteredTracks) - 1
+			// Stay at last song and pause
+			if m.ctrl != nil {
+				speaker.Lock()
+				m.ctrl.Paused = true
+				speaker.Unlock()
+			}
+			return m, nil
 		}
 	}
 	return m, m.loadSongCmd(m.currentIndex)
@@ -493,7 +503,7 @@ func (m model) View() string {
 		}
 	}
 
-	s += helpStyle.Render("Space: Pause • N/P: Next/Prev • J/K: Seek • Up/Down: Vol • []: A-B • \\: Clear • /: Search • Q: Quit") + "\n"
+	s += helpStyle.Render("Space: Pause • N/P: Next/Prev • Left/Right: Seek • Up/Down: Vol • []: A-B • \\: Clear • /: Search • Q: Quit") + "\n"
 
 	return s
 }
