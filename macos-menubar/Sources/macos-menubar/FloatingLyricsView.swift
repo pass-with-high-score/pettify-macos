@@ -187,6 +187,15 @@ struct FloatingLyricsView: View {
                         Button(action: { state.post("next") }) {
                             Image(systemName: "forward.fill").font(.system(size: 14))
                         }.buttonStyle(.plain)
+                        
+                        Button(action: { 
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                                state.isMiniMode.toggle()
+                            }
+                        }) {
+                            Image(systemName: state.isMiniMode ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left")
+                                .font(.system(size: 14))
+                        }.buttonStyle(.plain)
                     }
                     .foregroundColor(.white)
                     .padding(.top, 4)
@@ -206,11 +215,6 @@ struct FloatingLyricsView: View {
             .onHover { hovering in
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                     isHovering = hovering
-                }
-            }
-            .onTapGesture(count: 2) {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                    state.isMiniMode.toggle()
                 }
             }
         }
