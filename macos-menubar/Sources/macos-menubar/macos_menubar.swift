@@ -46,7 +46,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             floatingWindow.makeKeyAndOrderFront(nil)
             floatingWindow.snapToCorner()
         }
-        
         NotificationCenter.default.addObserver(forName: NSNotification.Name("ToggleFloatingLyrics"), object: nil, queue: .main) { [weak self] notification in
             let showVal = notification.object as? Bool
             DispatchQueue.main.async {
@@ -59,6 +58,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
             }
+        }
+        
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("OpenSettings"), object: nil, queue: .main) { [weak self] _ in
+            self?.openSettings()
+        }
+        
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("QuitApp"), object: nil, queue: .main) { _ in
+            NSApplication.shared.terminate(nil)
+            exit(0)
         }
     }
     

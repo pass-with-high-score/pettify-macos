@@ -37,11 +37,7 @@ struct PopoverView: View {
             HStack {
                 Spacer()
                 Button(action: {
-                    if #available(macOS 13.0, *) {
-                        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-                    } else {
-                        NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
-                    }
+                    NotificationCenter.default.post(name: NSNotification.Name("OpenSettings"), object: nil)
                 }) {
                     Image(systemName: "gearshape.fill")
                         .foregroundColor(.secondary)
@@ -51,7 +47,7 @@ struct PopoverView: View {
                 .help("Settings")
                 
                 Button(action: {
-                    NSApplication.shared.terminate(nil)
+                    NotificationCenter.default.post(name: NSNotification.Name("QuitApp"), object: nil)
                 }) {
                     Image(systemName: "power")
                         .foregroundColor(.secondary)
