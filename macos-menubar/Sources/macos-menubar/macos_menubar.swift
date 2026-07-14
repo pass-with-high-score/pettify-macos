@@ -288,6 +288,66 @@ struct PopoverView: View {
     }
 }
 
+struct OnekoView: View {
+    @State private var catPos: CGPoint = CGPoint(x: 100, y: 100)
+    @State private var isMoving = false
+    @State private var facingRight = false
+    @State private var wiggle = false
+    @State private var sleepTick = 0
+    
+    let timer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
+    
+    var body: some View {
+        ZStack {
+            Text(isMoving ? "🐈" : (sleepTick > 20 ? "🐱" : "🐈"))
+                .font(.system(size: 32))
+                .scaleEffect(x: facingRight ? -1 : 1, y: 1)
+                .rotationEffect(.degrees(isMoving && wiggle ? (facingRight ? 10 : -10) : 0))
+                .offset(y: isMoving && wiggle ? -4 : 0)
+                .position(catPos)
+                .shadow(color: .black.opacity(0.5), radius: 2)
+            
+            if !isMoving && sleepTick > 30 {
+                Text(sleepTick % 20 < 10 ? "💤" : "z")
+                    .font(.system(size: 14))
+                    .position(x: catPos.x + (facingRight ? 15 : -15), y: catPos.y - 20)
+            }
+        }
+        .onReceive(timer) { _ in
+            if let window = NSApp.windows.first(where: { $0 is FloatingLyricsWindow }) {
+                let mouseLoc = NSEvent.mouseLocation
+                let windowFrame = window.frame
+                
+                let localX = mouseLoc.x - windowFrame.minX
+                let localY = windowFrame.maxY - mouseLoc.y
+                
+                let targetX = max(16, min(windowFrame.width - 16, localX))
+                let targetY = max(16, min(windowFrame.height - 16, localY))
+                
+                let target = CGPoint(x: targetX, y: targetY)
+                let dx = target.x - catPos.x
+                let dy = target.y - catPos.y
+                let dist = sqrt(dx*dx + dy*dy)
+                
+                if dist > 20 {
+                    isMoving = true
+                    sleepTick = 0
+                    facingRight = dx > 0
+                    wiggle.toggle()
+                    
+                    let speed: CGFloat = min(dist, 10.0)
+                    catPos.x += (dx / dist) * speed
+                    catPos.y += (dy / dist) * speed
+                } else {
+                    isMoving = false
+                    sleepTick += 1
+                }
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
 class FloatingLyricsWindow: NSWindow {
     var state: AppState?
     var initialLocation: NSPoint?
@@ -374,6 +434,7 @@ struct FloatingLyricsView: View {
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: state.currentLyricIndex)
         .animation(.easeInOut(duration: 0.4), value: state.isTop)
         .animation(.easeInOut(duration: 0.4), value: state.isLeft)
+        .overlay(OnekoView())
     }
     
     @ViewBuilder
