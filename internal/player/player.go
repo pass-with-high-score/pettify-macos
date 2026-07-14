@@ -5,6 +5,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -16,6 +17,28 @@ import (
 )
 
 func Run(path string, shuffleFlag bool, loopFlag bool) {
+	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
+		if _, err := exec.LookPath("yt-dlp"); err != nil {
+			fmt.Println("❌ Error: yt-dlp is not installed or not in PATH.")
+			fmt.Println("Please install it from: https://github.com/yt-dlp/yt-dlp#installation")
+			os.Exit(1)
+		}
+		tempDir, err := os.MkdirTemp("", "audio-cli-yt-*")
+		if err != nil {
+			log.Fatalf("Failed to create temp directory: %v", err)
+		}
+		fmt.Println("⏳ Downloading audio using yt-dlp... Please wait.")
+		fmt.Printf("URL: %s\n\n", path)
+		cmd := exec.Command("yt-dlp", "-x", "--audio-format", "mp3", "-o", filepath.Join(tempDir, "%(autonumber)03d_%(title)s.%(ext)s"), path)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			log.Fatalf("yt-dlp failed: %v", err)
+		}
+		fmt.Println("\n✅ Download complete! Starting player...")
+		path = tempDir
+	}
+
 	var files []string
 	info, err := os.Stat(path)
 	if err != nil {
