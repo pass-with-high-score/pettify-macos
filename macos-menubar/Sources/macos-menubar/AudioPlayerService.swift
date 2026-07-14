@@ -22,6 +22,8 @@ final class AudioPlayerService: NSObject, ObservableObject {
     
     @Published var currentOutputDeviceID: AudioDeviceID = 0
     
+    private var hasLoadedFile: Bool = false
+    
     // MARK: Callback
 
     /// Called on the main actor when the current track finishes playing naturally.
@@ -82,6 +84,7 @@ final class AudioPlayerService: NSObject, ObservableObject {
             currentTime = 0.0
             seekTimeOffset = 0.0
             isManualStop = false
+            hasLoadedFile = true
             
             if !engine.isRunning {
                 try engine.start()
@@ -113,6 +116,7 @@ final class AudioPlayerService: NSObject, ObservableObject {
     }
 
     func resume() {
+        guard !isPlaying, hasLoadedFile else { return }
         if !engine.isRunning { try? engine.start() }
         playerNode.play()
         isPlaying = true
@@ -175,6 +179,7 @@ final class AudioPlayerService: NSObject, ObservableObject {
         isPlaying = false
         currentTime = 0.0
         duration = 0.0
+        hasLoadedFile = false
     }
     
     private func handlePlaybackFinished() {
@@ -272,6 +277,11 @@ final class AudioPlayerService: NSObject, ObservableObject {
             self.currentOutputDeviceID = id
         }
         
+        let wasPlaying = engine.isRunning
+        if wasPlaying {
+            engine.pause()
+        }
+        
         AudioUnitSetProperty(
             outputUnit,
             kAudioOutputUnitProperty_CurrentDevice,
@@ -280,5 +290,13 @@ final class AudioPlayerService: NSObject, ObservableObject {
             &deviceID,
             UInt32(MemoryLayout<AudioDeviceID>.size)
         )
+        
+        if wasPlaying {
+            do {
+                try engine.start()
+            } catch {
+                print("Failed to restart engine after changing device: \(error)")
+            }
+        }
     }
 }
