@@ -241,14 +241,12 @@ struct PopoverView: View {
                     .font(.caption2.monospacedDigit())
                     .foregroundColor(.secondary)
                     
-                Slider(value: Binding(get: {
+                CustomSlider(value: Binding(get: {
                     state.status.position
                 }, set: { val in
                     state.status.position = val
                     state.seek(to: val)
-                }), in: 0...max(0.1, state.status.duration))
-                .controlSize(.small)
-                .tint(.accentColor)
+                }), total: max(0.1, state.status.duration))
                 
                 Text(state.formatTime(state.status.duration))
                     .font(.caption2.monospacedDigit())
@@ -272,19 +270,83 @@ struct PopoverView: View {
             
             HStack {
                 Image(systemName: "speaker.fill").foregroundColor(.secondary).font(.caption2)
-                Slider(value: Binding(get: {
+                CustomSlider(value: Binding(get: {
                     state.status.volume
                 }, set: { val in
                     state.status.volume = val
                     state.setVolume(val)
-                }), in: 0...1)
-                .controlSize(.mini)
+                }), total: 1.0)
+                .frame(width: 80)
                 Image(systemName: "speaker.wave.3.fill").foregroundColor(.secondary).font(.caption2)
             }
         }
         .padding(20)
         .frame(width: 260, height: state.lyrics.isEmpty ? 350 : 450)
         .background(VisualEffectView().edgesIgnoringSafeArea(.all))
+    }
+}
+
+struct CustomSlider: View {
+    @Binding var value: Double
+    var total: Double
+    var onEditingChanged: () -> Void = {}
+    
+    @State private var isDragging = false
+    @State private var dragValue: Double?
+    
+    var body: some View {
+        GeometryReader { geo in
+            let displayValue = isDragging ? (dragValue ?? value) : value
+            let percent = max(0, min(1, total > 0 ? displayValue / total : 0))
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.primary.opacity(0.2)).frame(height: 4)
+                Capsule().fill(Color.primary).frame(width: geo.size.width * CGFloat(percent), height: 4)
+                Circle()
+                    .fill(Color.primary)
+                    .frame(width: isDragging ? 10 : 8, height: isDragging ? 10 : 8)
+                    .offset(x: max(0, min(geo.size.width * CGFloat(percent) - (isDragging ? 5 : 4), geo.size.width - (isDragging ? 10 : 8))))
+                    .shadow(color: .black.opacity(0.2), radius: 2)
+            }
+            .frame(height: 12, alignment: .center)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { drag in
+                        isDragging = true
+                        let percentage = min(max(0, drag.location.x / geo.size.width), 1)
+                        dragValue = Double(percentage) * total
+                    }
+                    .onEnded { drag in
+                        isDragging = false
+                        let percentage = min(max(0, drag.location.x / geo.size.width), 1)
+                        value = Double(percentage) * total
+                        onEditingChanged()
+                    }
+            )
+        }
+        .frame(height: 12)
+    }
+}
+
+struct CustomProgressBar: View {
+    var value: Double
+    var total: Double
+    
+    var body: some View {
+        GeometryReader { geo in
+            let percent = max(0, min(1, total > 0 ? value / total : 0))
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.white.opacity(0.3)).frame(height: 4)
+                Capsule().fill(Color.white).frame(width: geo.size.width * CGFloat(percent), height: 4)
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 8, height: 8)
+                    .offset(x: max(0, min(geo.size.width * CGFloat(percent) - 4, geo.size.width - 8)))
+                    .shadow(color: .black.opacity(0.5), radius: 1)
+            }
+            .frame(height: 8, alignment: .center)
+        }
+        .frame(height: 8)
     }
 }
 
@@ -602,8 +664,7 @@ struct FloatingLyricsView: View {
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundColor(.white.opacity(0.8))
                 
-                ProgressView(value: state.status.position, total: max(0.1, state.status.duration))
-                    .progressViewStyle(LinearProgressViewStyle(tint: .white))
+                CustomProgressBar(value: state.status.position, total: max(0.1, state.status.duration))
                     .frame(width: 120)
                 
                 Text(state.formatTime(state.status.duration))
