@@ -14,11 +14,11 @@ struct FloatingNote: Identifiable {
 
 struct FloatingNotesView: View {
     var isPlaying: Bool
+    var dominantColor: Color
     @State private var notes: [FloatingNote] = []
     let timer = Timer.publish(every: 0.6, on: .main, in: .common).autoconnect()
     
     let symbols = ["music.note", "music.quarternote.3", "sparkles", "heart.fill", "star.fill"]
-    let colors: [Color] = [.pink, .purple, .cyan, .mint, .orange, .yellow]
     
     var body: some View {
         GeometryReader { geo in
@@ -53,7 +53,7 @@ struct FloatingNotesView: View {
             scale: CGFloat.random(in: 0.6...1.2),
             opacity: 1.0,
             symbol: symbols.randomElement()!,
-            color: colors.randomElement()!
+            color: dominantColor
         )
         
         notes.append(newNote)

@@ -110,8 +110,7 @@ struct FloatingLyricsView: View {
                 Text(state.lyrics[state.currentLyricIndex].text)
                     .font(.system(size: 36, weight: .black, design: .rounded))
                     .foregroundColor(.white)
-                    .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 2)
-                    .shadow(color: .black.opacity(0.5), radius: 10, x: 0, y: 0)
+                    .shadow(color: state.dominantColor.opacity(0.8), radius: 10, x: 0, y: 0)
                     .multilineTextAlignment(state.isLeft ? .leading : .trailing)
                     .lineLimit(2)
                     .id(state.lyrics[state.currentLyricIndex].id)
@@ -159,7 +158,7 @@ struct FloatingLyricsView: View {
             .background(
                 ZStack {
                     VisualEffectView().cornerRadius(12).opacity(0.9)
-                    FloatingNotesView(isPlaying: !state.status.paused)
+                    FloatingNotesView(isPlaying: !state.status.paused, dominantColor: state.dominantColor)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
             )

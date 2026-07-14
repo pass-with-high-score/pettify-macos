@@ -1,6 +1,7 @@
 import Cocoa
 import SwiftUI
 import MediaPlayer
+import CoreImage
 
 @MainActor
 class AppState: ObservableObject {
@@ -9,7 +10,9 @@ class AppState: ObservableObject {
     @Published var currentLyricIndex: Int = -1
     @Published var isTop: Bool = false
     @Published var isLeft: Bool = true
+    @Published var dominantColor: Color = .white
     var lastSearchedTitle: String = ""
+    var lastThumbnail: String = ""
     var timer: Timer?
     
     init() {
@@ -32,6 +35,10 @@ class AppState: ObservableObject {
                     if s.title != self.lastSearchedTitle && s.title != "Loading..." {
                         self.lastSearchedTitle = s.title
                         self.fetchLyrics(for: s.title)
+                    }
+                    if s.thumbnail != self.lastThumbnail && s.thumbnail != "" {
+                        self.lastThumbnail = s.thumbnail
+                        self.extractDominantColor(from: s.thumbnail)
                     }
                 }
             } catch {}
@@ -163,6 +170,32 @@ class AppState: ObservableObject {
         commandCenter.previousTrackCommand.addTarget { [unowned self] event in
             self.post("prev")
             return .success
+        }
+    }
+    
+    func extractDominantColor(from imageURL: String) {
+        guard let url = URL(string: imageURL) else { return }
+        Task {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                guard let nsImage = NSImage(data: data),
+                      let cgImage = nsImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
+                
+                let ciImage = CIImage(cgImage: cgImage)
+                let extentVector = CIVector(x: ciImage.extent.origin.x, y: ciImage.extent.origin.y, z: ciImage.extent.size.width, w: ciImage.extent.size.height)
+                
+                guard let filter = CIFilter(name: "CIAreaAverage", parameters: [kCIInputImageKey: ciImage, kCIInputExtentKey: extentVector]),
+                      let outputImage = filter.outputImage else { return }
+                
+                var bitmap = [UInt8](repeating: 0, count: 4)
+                let context = CIContext(options: [.workingColorSpace: kCFNull!])
+                context.render(outputImage, toBitmap: &bitmap, rowBytes: 4, bounds: CGRect(x: 0, y: 0, width: 1, height: 1), format: .RGBA8, colorSpace: nil)
+                
+                let color = Color(red: Double(bitmap[0]) / 255.0, green: Double(bitmap[1]) / 255.0, blue: Double(bitmap[2]) / 255.0)
+                DispatchQueue.main.async {
+                    self.dominantColor = color
+                }
+            } catch {}
         }
     }
 }
