@@ -2,6 +2,12 @@ import Cocoa
 import SwiftUI
 import MediaPlayer
 
+struct LyricLine: Identifiable {
+    let id = UUID()
+    let time: Double
+    let text: String
+}
+
 struct TrackStatus: Decodable {
     var title: String
     var artist: String
@@ -16,6 +22,9 @@ struct TrackStatus: Decodable {
 @MainActor
 class AppState: ObservableObject {
     @Published var status = TrackStatus(title: "Loading...", artist: "", thumbnail: "", paused: false, volume: 1.0, percent: 0, position: 0, duration: 0)
+    @Published var lyrics: [LyricLine] = []
+    @Published var currentLyricIndex: Int = -1
+    var lastSearchedTitle: String = ""
     
     init() {
         setupRemoteTransportControls()
@@ -29,6 +38,11 @@ class AppState: ObservableObject {
                 if let s = try? JSONDecoder().decode(TrackStatus.self, from: data) {
                     self.status = s
                     self.updateNowPlaying()
+                    self.updateCurrentLyric()
+                    if s.title != self.lastSearchedTitle && s.title != "Loading..." {
+                        self.lastSearchedTitle = s.title
+                        self.fetchLyrics(for: s.title)
+                    }
                 }
             } catch {}
         }
@@ -59,6 +73,62 @@ class AppState: ObservableObject {
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         Task { _ = try? await URLSession.shared.data(for: req) }
+    }
+    
+    func fetchLyrics(for title: String) {
+        let cleanTitle = title.components(separatedBy: "(")[0].components(separatedBy: "[")[0].trimmingCharacters(in: .whitespaces)
+        guard let encoded = cleanTitle.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://lrclib.net/api/search?q=\(encoded)") else { return }
+
+        Task {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                if let results = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+                   let first = results.first,
+                   let syncedLyrics = first["syncedLyrics"] as? String {
+                    self.parseLRC(syncedLyrics)
+                } else {
+                    DispatchQueue.main.async { self.lyrics = [] }
+                }
+            } catch {
+                DispatchQueue.main.async { self.lyrics = [] }
+            }
+        }
+    }
+    
+    func parseLRC(_ lrc: String) {
+        var lines: [LyricLine] = []
+        let regex = try! NSRegularExpression(pattern: "\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})\\](.*)")
+        for line in lrc.components(separatedBy: .newlines) {
+            let nsString = line as NSString
+            let results = regex.matches(in: line, range: NSRange(location: 0, length: nsString.length))
+            if let match = results.first {
+                let min = Double(nsString.substring(with: match.range(at: 1))) ?? 0
+                let sec = Double(nsString.substring(with: match.range(at: 2))) ?? 0
+                let msStr = nsString.substring(with: match.range(at: 3))
+                let ms = Double(msStr) ?? 0
+                let msDivider: Double = msStr.count == 3 ? 1000 : 100
+                let text = nsString.substring(with: match.range(at: 4)).trimmingCharacters(in: .whitespaces)
+                let time = min * 60 + sec + ms / msDivider
+                lines.append(LyricLine(time: time, text: text))
+            }
+        }
+        DispatchQueue.main.async { self.lyrics = lines }
+    }
+    
+    func updateCurrentLyric() {
+        let pos = status.position
+        var bestIndex = -1
+        for (i, line) in lyrics.enumerated() {
+            if line.time <= pos + 0.3 { // small pre-fetch offset
+                bestIndex = i
+            } else {
+                break
+            }
+        }
+        if currentLyricIndex != bestIndex {
+            DispatchQueue.main.async { self.currentLyricIndex = bestIndex }
+        }
     }
     
     func updateNowPlaying() {
@@ -126,6 +196,32 @@ struct PopoverView: View {
                 }
             }
             
+            if !state.lyrics.isEmpty {
+                VStack(spacing: 6) {
+                    if state.currentLyricIndex >= 0 && state.currentLyricIndex < state.lyrics.count {
+                        Text(state.lyrics[state.currentLyricIndex].text)
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .id(state.lyrics[state.currentLyricIndex].id) // force transition
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    } else {
+                        Text("♪").font(.system(size: 15)).foregroundColor(.secondary)
+                    }
+                    
+                    if state.currentLyricIndex + 1 < state.lyrics.count {
+                        Text(state.lyrics[state.currentLyricIndex + 1].text)
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary.opacity(0.7))
+                            .multilineTextAlignment(.center)
+                            .lineLimit(1)
+                    }
+                }
+                .frame(height: 50)
+                .animation(.easeInOut(duration: 0.3), value: state.currentLyricIndex)
+            }
+            
             Slider(value: Binding(get: {
                 state.status.position
             }, set: { val in
@@ -163,7 +259,7 @@ struct PopoverView: View {
             }
         }
         .padding(20)
-        .frame(width: 260, height: 320)
+        .frame(width: 260, height: state.lyrics.isEmpty ? 320 : 380)
         .background(VisualEffectView().edgesIgnoringSafeArea(.all))
         .onReceive(timer) { _ in state.fetch() }
         .onAppear { state.fetch() }
@@ -201,7 +297,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let contentView = PopoverView()
         popover = NSPopover()
-        popover.contentSize = NSSize(width: 260, height: 320)
+        popover.contentSize = NSSize(width: 260, height: 380)
         popover.behavior = .transient
         popover.contentViewController = NSHostingController(rootView: contentView)
         
