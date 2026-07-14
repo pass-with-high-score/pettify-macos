@@ -173,34 +173,34 @@ struct FloatingLyricsView: View {
                     if state.isLeft { infoText }
                 }
                 
-                if isHovering {
-                    HStack(spacing: 20) {
-                        Button(action: { state.post("prev") }) {
-                            Image(systemName: "backward.fill").font(.system(size: 14))
-                        }.buttonStyle(.plain)
-                        
-                        Button(action: { state.post("playpause") }) {
-                            Image(systemName: state.status.paused ? "play.fill" : "pause.fill")
-                                .font(.system(size: 18))
-                        }.buttonStyle(.plain)
-                        
-                        Button(action: { state.post("next") }) {
-                            Image(systemName: "forward.fill").font(.system(size: 14))
-                        }.buttonStyle(.plain)
-                        
-                        Button(action: { 
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                                state.isMiniMode.toggle()
-                            }
-                        }) {
-                            Image(systemName: state.isMiniMode ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left")
-                                .font(.system(size: 14))
-                        }.buttonStyle(.plain)
-                    }
-                    .foregroundColor(.white)
-                    .padding(.top, 4)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                HStack(spacing: 20) {
+                    Button(action: { state.post("prev") }) {
+                        Image(systemName: "backward.fill").font(.system(size: 14))
+                    }.buttonStyle(.plain)
+                    
+                    Button(action: { state.post("playpause") }) {
+                        Image(systemName: state.status.paused ? "play.fill" : "pause.fill")
+                            .font(.system(size: 18))
+                    }.buttonStyle(.plain)
+                    
+                    Button(action: { state.post("next") }) {
+                        Image(systemName: "forward.fill").font(.system(size: 14))
+                    }.buttonStyle(.plain)
+                    
+                    Button(action: { 
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                            state.isMiniMode.toggle()
+                        }
+                    }) {
+                        Image(systemName: state.isMiniMode ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left")
+                            .font(.system(size: 14))
+                    }.buttonStyle(.plain)
                 }
+                .foregroundColor(.white)
+                .padding(.top, 4)
+                .opacity(isHovering ? 1.0 : 0.0)
+                .allowsHitTesting(isHovering)
+                .animation(.easeInOut(duration: 0.2), value: isHovering)
             }
             .padding(12)
             .background(
