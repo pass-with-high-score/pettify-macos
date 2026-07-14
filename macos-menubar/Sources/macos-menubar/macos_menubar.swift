@@ -222,14 +222,24 @@ struct PopoverView: View {
                 .animation(.easeInOut(duration: 0.3), value: state.currentLyricIndex)
             }
             
-            Slider(value: Binding(get: {
-                state.status.position
-            }, set: { val in
-                state.status.position = val
-                state.seek(to: val)
-            }), in: 0...max(0.1, state.status.duration))
-            .controlSize(.small)
-            .tint(.accentColor)
+            HStack(spacing: 8) {
+                Text(formatTime(state.status.position))
+                    .font(.caption2.monospacedDigit())
+                    .foregroundColor(.secondary)
+                    
+                Slider(value: Binding(get: {
+                    state.status.position
+                }, set: { val in
+                    state.status.position = val
+                    state.seek(to: val)
+                }), in: 0...max(0.1, state.status.duration))
+                .controlSize(.small)
+                .tint(.accentColor)
+                
+                Text(formatTime(state.status.duration))
+                    .font(.caption2.monospacedDigit())
+                    .foregroundColor(.secondary)
+            }
             
             HStack(spacing: 30) {
                 Button(action: { state.post("prev") }) { 
@@ -263,6 +273,14 @@ struct PopoverView: View {
         .background(VisualEffectView().edgesIgnoringSafeArea(.all))
         .onReceive(timer) { _ in state.fetch() }
         .onAppear { state.fetch() }
+    }
+    
+    func formatTime(_ seconds: Double) -> String {
+        guard !seconds.isNaN && !seconds.isInfinite else { return "0:00" }
+        let totalSeconds = Int(seconds)
+        let m = totalSeconds / 60
+        let s = totalSeconds % 60
+        return String(format: "%d:%02d", m, s)
     }
 }
 
