@@ -1,6 +1,7 @@
 package player
 
 import (
+	"bytes"
 	"crypto/md5"
 	"fmt"
 	"os"
@@ -33,10 +34,13 @@ func (m model) loadSongCmd(index int) tea.Cmd {
 			outFile := filepath.Join(tempDir, hash+".mp3")
 			
 			if _, err := os.Stat(outFile); os.IsNotExist(err) {
+				var stdout, stderr bytes.Buffer
 				cmd := exec.Command("yt-dlp", "-x", "--audio-format", "mp3", "-o", outFile, track.Path)
-				out, err := cmd.CombinedOutput()
+				cmd.Stdout = &stdout
+				cmd.Stderr = &stderr
+				err := cmd.Run()
 				if err != nil {
-					return loadMsg{err: fmt.Errorf("failed to download (yt-dlp): %v\nOutput: %s", err, string(out))}
+					return loadMsg{err: fmt.Errorf("failed to download (yt-dlp): %v\nOutput: %s", err, stderr.String())}
 				}
 			}
 			filePath = outFile

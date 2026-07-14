@@ -1,6 +1,7 @@
 package player
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"math/rand"
@@ -28,13 +29,16 @@ func Run(path string, shuffleFlag bool, loopFlag bool) {
 		}
 		
 		fmt.Println("⏳ Fetching playlist info... Please wait.")
+		var stdout, stderr bytes.Buffer
 		cmd := exec.Command("yt-dlp", "--flat-playlist", "--print", "%(title)s|%(url)s|%(uploader)s", path)
-		out, err := cmd.CombinedOutput()
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		err := cmd.Run()
 		if err != nil {
-			log.Fatalf("\n❌ yt-dlp failed:\n%s\nError: %v\n\n💡 Tip: If YouTube says 'Sign in to confirm you’re not a bot' or 'HTTP 429', try updating yt-dlp (e.g., 'brew upgrade yt-dlp' or 'pip install -U yt-dlp') or use a different network.", string(out), err)
+			log.Fatalf("\n❌ yt-dlp failed:\n%s\nError: %v\n\n💡 Tip: If YouTube says 'Sign in to confirm you’re not a bot' or 'HTTP 429', try updating yt-dlp (e.g., 'brew upgrade yt-dlp' or 'pip install -U yt-dlp') or use a different network.", stderr.String(), err)
 		}
 		
-		lines := strings.Split(string(out), "\n")
+		lines := strings.Split(stdout.String(), "\n")
 		for i, line := range lines {
 			if strings.TrimSpace(line) == "" {
 				continue
@@ -55,7 +59,7 @@ func Run(path string, shuffleFlag bool, loopFlag bool) {
 					Title:  title,
 					Artist: artist,
 				})
-				filtered = append(filtered, i)
+				filtered = append(filtered, len(tracks)-1)
 			}
 		}
 	} else {
