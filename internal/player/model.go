@@ -66,6 +66,8 @@ type model struct {
 	abActive       bool
 	loading        bool
 	config         Config
+	lastPos        int
+	stalledTicks   int
 }
 
 type tickMsg time.Time

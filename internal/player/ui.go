@@ -195,6 +195,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.streamer = msg.streamer
 		m.format = msg.format
 		m.abActive = false
+		m.lastPos = 0
+		m.stalledTicks = 0
 		
 		m.ctrl = &beep.Ctrl{Streamer: m.streamer, Paused: false}
 		m.volume = &effects.Volume{Streamer: m.ctrl, Base: 2, Volume: m.config.Volume, Silent: false}
@@ -312,13 +314,26 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.streamer.Seek(m.pointA)
 				speaker.Unlock()
 			}
-			if pos >= length {
-				nm, cmd := m.nextSong()
-				if nm.quitting {
+			
+			isPaused := false
+			if m.ctrl != nil {
+				isPaused = m.ctrl.Paused
+			}
+			
+			if pos >= length || (m.lastPos == pos && !isPaused && pos > 0 && !m.loading) {
+				m.stalledTicks++
+				if m.stalledTicks > 3 {
+					m.stalledTicks = 0
+					nm, cmd := m.nextSong()
+					if nm.quitting {
+						return nm, cmd
+					}
 					return nm, cmd
 				}
-				return nm, cmd
+			} else {
+				m.stalledTicks = 0
 			}
+			m.lastPos = pos
 		}
 		return m, tick()
 
