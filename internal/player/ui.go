@@ -14,7 +14,6 @@ import (
 	"github.com/faiface/beep"
 	"github.com/faiface/beep/effects"
 	"github.com/faiface/beep/speaker"
-	"github.com/getlantern/systray"
 )
 
 var (
@@ -321,6 +320,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, tick()
 
+	case toggleMsg:
+		if m.ctrl != nil {
+			speaker.Lock()
+			m.ctrl.Paused = !m.ctrl.Paused
+			speaker.Unlock()
+		}
+		return m, nil
+	
+	case nextTrackMsg:
+		return m.nextSong()
+
+	case prevTrackMsg:
+		return m.prevSong()
+
 	case progress.FrameMsg:
 		progressModel, cmd := m.progress.Update(msg)
 		m.progress = progressModel.(progress.Model)
@@ -339,23 +352,13 @@ func (m model) View() string {
 	}
 
 	if m.loading {
-		systray.SetTitle("🎵 Loading...")
 		return "\n  " + dimStyle.Render("Loading...") + "\n"
 	}
 
 	if len(m.filteredTracks) == 0 {
 		return "\n  No tracks found.\n"
 	}
-
-	track := m.tracks[m.filteredTracks[m.currentIndex]]
 	
-	// Update systray
-	if m.ctrl != nil && m.ctrl.Paused {
-		systray.SetTitle("⏸ " + track.Title)
-	} else {
-		systray.SetTitle("▶️ " + track.Title)
-	}
-
 	var percent float64
 	var elapsed, total time.Duration
 	if m.streamer != nil {
