@@ -28,6 +28,13 @@ struct PopoverView: View {
             }
             .padding(.horizontal, 4)
             
+            if state.status.searchStatus != "" {
+                Text(state.status.searchStatus)
+                    .font(.caption)
+                    .foregroundColor(.accentColor)
+                    .transition(.opacity)
+            }
+            
             if state.status.thumbnail != "" {
                 AsyncImage(url: URL(string: state.status.thumbnail)) { phase in
                     if let image = phase.image {

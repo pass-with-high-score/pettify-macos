@@ -17,4 +17,5 @@ struct TrackStatus: Decodable {
     var percent: Double
     var position: Double
     var duration: Double
+    var searchStatus: String = ""
 }

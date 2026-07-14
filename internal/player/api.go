@@ -19,10 +19,11 @@ type StatusResponse struct {
 	Artist    string  `json:"artist"`
 	Thumbnail string  `json:"thumbnail"`
 	Paused    bool    `json:"paused"`
-	Volume    float64 `json:"volume"`
-	Percent   float64 `json:"percent"`
-	Position  float64 `json:"position"`
-	Duration  float64 `json:"duration"`
+	Volume       float64 `json:"volume"`
+	Percent      float64 `json:"percent"`
+	Position     float64 `json:"position"`
+	Duration     float64 `json:"duration"`
+	SearchStatus string  `json:"searchStatus"`
 }
 
 func getThumbnail(url string) string {
@@ -90,10 +91,11 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 		Artist:    track.Artist,
 		Thumbnail: getThumbnail(track.Path),
 		Paused:    paused,
-		Volume:    vol,
-		Percent:   percent,
-		Position:  posSeconds,
-		Duration:  durSeconds,
+		Volume:       vol,
+		Percent:      percent,
+		Position:     posSeconds,
+		Duration:     durSeconds,
+		SearchStatus: m.addStatus,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

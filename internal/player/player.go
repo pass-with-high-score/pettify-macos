@@ -151,7 +151,7 @@ func Run(path string, shuffleFlag bool, loopFlag bool) {
 		searchBar:      ti,
 		loop:           loopFlag,
 		shuffle:        shuffleFlag,
-		loading:        true,
+		loading:        len(tracks) > 0,
 		config:         loadConfig(),
 	}
 	m.searchBar.Prompt = ""
