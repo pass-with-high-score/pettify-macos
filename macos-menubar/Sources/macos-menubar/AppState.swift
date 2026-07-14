@@ -13,6 +13,7 @@ class AppState: ObservableObject {
     @Published var dominantColor: Color = .white
     @Published var dragVelocity: CGSize = .zero
     @Published var isMiniMode: Bool = false
+    @Published var isHyperSpeed: Bool = false
     var lastSearchedTitle: String = ""
     var lastThumbnail: String = ""
     var timer: Timer?
@@ -200,6 +201,13 @@ class AppState: ObservableObject {
                     self.dominantColor = color
                 }
             } catch {}
+        }
+    }
+    
+    func triggerHyperSpeed() {
+        self.isHyperSpeed = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            self.isHyperSpeed = false
         }
     }
 }

@@ -11,10 +11,11 @@ struct OnekoView: View {
     @State private var frameNo = 25
     @State private var surpriseTick = 0
     @State private var showHeart = false
+    @State private var normalTickCounter = 0
     
     enum Direction { case right, down, left, up }
     
-    let timer = Timer.publish(every: 0.15, on: .main, in: .common).autoconnect()
+    let timer = Timer.publish(every: 0.02, on: .main, in: .common).autoconnect()
     
     var body: some View {
         GeometryReader { geo in
@@ -44,12 +45,19 @@ struct OnekoView: View {
                 }
             }
             .onReceive(timer) { _ in
-                updateCat(size: geo.size)
+                if state.isHyperSpeed {
+                    updateCat(size: geo.size, hyper: true)
+                } else {
+                    normalTickCounter += 1
+                    if normalTickCounter % 7 == 0 {
+                        updateCat(size: geo.size, hyper: false)
+                    }
+                }
             }
         }
     }
     
-    func updateCat(size: CGSize) {
+    func updateCat(size: CGSize, hyper: Bool = false) {
         tickCounter += 1
         
         if surpriseTick > 0 {
@@ -89,7 +97,7 @@ struct OnekoView: View {
             return
         }
         
-        let speed: CGFloat = 4
+        let speed: CGFloat = hyper ? 30 : 4
         
         switch direction {
         case .right:

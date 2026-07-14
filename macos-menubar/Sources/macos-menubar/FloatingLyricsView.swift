@@ -153,7 +153,7 @@ struct FloatingLyricsView: View {
                     if !state.isLeft { infoText }
                     
                     if state.status.thumbnail != "" {
-                        SpinningVinylView(imageURL: state.status.thumbnail, isPlaying: !state.status.paused)
+                        SpinningVinylView(state: state, imageURL: state.status.thumbnail)
                     } else {
                         Image(systemName: "music.note.list")
                             .font(.system(size: 20))
@@ -258,8 +258,8 @@ struct FloatingLyricsView: View {
 }
 
 struct SpinningVinylView: View {
+    @ObservedObject var state: AppState
     var imageURL: String
-    var isPlaying: Bool
     
     @State private var rotation: Double = 0
     let timer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
@@ -283,9 +283,12 @@ struct SpinningVinylView: View {
         .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
         .shadow(color: .black.opacity(0.4), radius: 3, x: 0, y: 2)
         .rotationEffect(.degrees(rotation))
+        .onTapGesture {
+            state.triggerHyperSpeed()
+        }
         .onReceive(timer) { _ in
-            if isPlaying {
-                rotation += 2.0
+            if !state.status.paused {
+                rotation += state.isHyperSpeed ? 50.0 : 2.0
             }
         }
     }
