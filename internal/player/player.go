@@ -22,18 +22,18 @@ func Run(path string, shuffleFlag bool, loopFlag bool) {
 	var filtered []int
 
 	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
-		if _, err := exec.LookPath("yt-dlp"); err != nil {
-			fmt.Println("❌ Error: yt-dlp is not installed or not in PATH.")
-			fmt.Println("Please install it from: https://github.com/yt-dlp/yt-dlp#installation")
+		ytDlpPath, err := ensureYtDlp()
+		if err != nil {
+			fmt.Printf("❌ Error: Failed to setup internal yt-dlp: %v\n", err)
 			os.Exit(1)
 		}
 		
-		fmt.Println("⏳ Fetching playlist info... Please wait.")
+		fmt.Printf("⏳ Fetching playlist info (Using internal yt-dlp)... Please wait.\n")
 		var stdout, stderr bytes.Buffer
-		cmd := exec.Command("yt-dlp", "--flat-playlist", "--print", "%(title)s|%(url)s|%(uploader)s", path)
+		cmd := exec.Command(ytDlpPath, "--flat-playlist", "--print", "%(title)s|%(id)s|%(url)s|%(uploader)s", path)
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
-		err := cmd.Run()
+		err = cmd.Run()
 		if err != nil {
 			log.Fatalf("\n❌ yt-dlp failed:\n%s\nError: %v\n\n💡 Tip: If YouTube says 'Sign in to confirm you’re not a bot' or 'HTTP 429', try updating yt-dlp (e.g., 'brew upgrade yt-dlp' or 'pip install -U yt-dlp') or use a different network.", stderr.String(), err)
 		}
@@ -44,18 +44,28 @@ func Run(path string, shuffleFlag bool, loopFlag bool) {
 				continue
 			}
 			parts := strings.Split(line, "|")
-			if len(parts) >= 2 {
+			if len(parts) >= 3 {
 				title := parts[0]
-				url := parts[1]
-				if !strings.HasPrefix(url, "http") {
-					url = "https://youtu.be/" + url
+				id := parts[1]
+				url := parts[2]
+				
+				finalURL := ""
+				if strings.HasPrefix(url, "http") && url != "NA" {
+					finalURL = url
+				} else if id != "NA" && id != "" {
+					finalURL = "https://youtu.be/" + id
 				}
+				
+				if finalURL == "" {
+					continue
+				}
+				
 				artist := ""
-				if len(parts) >= 3 {
-					artist = parts[2]
+				if len(parts) >= 4 {
+					artist = parts[3]
 				}
 				tracks = append(tracks, Track{
-					Path:   url,
+					Path:   finalURL,
 					Title:  title,
 					Artist: artist,
 				})

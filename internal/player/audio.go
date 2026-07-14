@@ -34,8 +34,9 @@ func (m model) loadSongCmd(index int) tea.Cmd {
 			outFile := filepath.Join(tempDir, hash+".mp3")
 			
 			if _, err := os.Stat(outFile); os.IsNotExist(err) {
+				ytDlpPath := getInternalYtDlpPath()
 				var stdout, stderr bytes.Buffer
-				cmd := exec.Command("yt-dlp", "-x", "--audio-format", "mp3", "-o", outFile, track.Path)
+				cmd := exec.Command(ytDlpPath, "-x", "--audio-format", "mp3", "-o", outFile, track.Path)
 				cmd.Stdout = &stdout
 				cmd.Stderr = &stderr
 				err := cmd.Run()
