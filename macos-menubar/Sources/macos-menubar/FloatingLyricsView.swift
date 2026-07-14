@@ -21,6 +21,7 @@ class FloatingLyricsWindow: NSWindow {
     
     override func mouseDown(with event: NSEvent) {
         self.initialLocation = event.locationInWindow
+        super.mouseDown(with: event)
     }
     
     override func mouseDragged(with event: NSEvent) {
@@ -65,6 +66,7 @@ class FloatingLyricsWindow: NSWindow {
 
 struct FloatingLyricsView: View {
     @ObservedObject var state: AppState
+    @State private var isHovering = false
 
     var alignment: Alignment {
         switch (state.isTop, state.isLeft) {
@@ -131,28 +133,50 @@ struct FloatingLyricsView: View {
     @ViewBuilder
     var songInfo: some View {
         if state.status.title != "Loading..." {
-            HStack(spacing: 12) {
-                if !state.isLeft { infoText }
-                
-                if state.status.thumbnail != "" {
-                    AsyncImage(url: URL(string: state.status.thumbnail)) { phase in
-                        if let image = phase.image {
-                            image.resizable().aspectRatio(contentMode: .fill)
-                        } else {
-                            ZStack {
-                                Color.white.opacity(0.1)
-                                Image(systemName: "music.note")
-                                    .foregroundColor(.white.opacity(0.5))
+            VStack(alignment: state.isLeft ? .leading : .trailing, spacing: 8) {
+                HStack(spacing: 12) {
+                    if !state.isLeft { infoText }
+                    
+                    if state.status.thumbnail != "" {
+                        AsyncImage(url: URL(string: state.status.thumbnail)) { phase in
+                            if let image = phase.image {
+                                image.resizable().aspectRatio(contentMode: .fill)
+                            } else {
+                                ZStack {
+                                    Color.white.opacity(0.1)
+                                    Image(systemName: "music.note")
+                                        .foregroundColor(.white.opacity(0.5))
+                                }
                             }
-                        }
-                    }.frame(width: 40, height: 40).cornerRadius(6)
-                } else {
-                    Image(systemName: "music.note.list")
-                        .font(.system(size: 20))
-                        .foregroundColor(.white)
+                        }.frame(width: 40, height: 40).cornerRadius(6)
+                    } else {
+                        Image(systemName: "music.note.list")
+                            .font(.system(size: 20))
+                            .foregroundColor(.white)
+                    }
+                    
+                    if state.isLeft { infoText }
                 }
                 
-                if state.isLeft { infoText }
+                if isHovering {
+                    HStack(spacing: 20) {
+                        Button(action: { state.post("prev") }) {
+                            Image(systemName: "backward.fill").font(.system(size: 14))
+                        }.buttonStyle(.plain)
+                        
+                        Button(action: { state.post("playpause") }) {
+                            Image(systemName: state.status.paused ? "play.fill" : "pause.fill")
+                                .font(.system(size: 18))
+                        }.buttonStyle(.plain)
+                        
+                        Button(action: { state.post("next") }) {
+                            Image(systemName: "forward.fill").font(.system(size: 14))
+                        }.buttonStyle(.plain)
+                    }
+                    .foregroundColor(.white)
+                    .padding(.top, 4)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
             }
             .padding(12)
             .background(
@@ -164,6 +188,11 @@ struct FloatingLyricsView: View {
             )
             .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 4)
             .overlay(OnekoView())
+            .onHover { hovering in
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    isHovering = hovering
+                }
+            }
         }
     }
     
@@ -192,7 +221,12 @@ struct FloatingLyricsView: View {
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundColor(.white.opacity(0.8))
                 
-                CustomProgressBar(value: state.status.position, total: max(0.1, state.status.duration))
+                CustomSlider(value: Binding(get: {
+                    state.status.position
+                }, set: { val in
+                    state.status.position = val
+                    state.seek(to: val)
+                }), total: max(0.1, state.status.duration))
                     .frame(width: 120)
                 
                 Text(state.formatTime(state.status.duration))
