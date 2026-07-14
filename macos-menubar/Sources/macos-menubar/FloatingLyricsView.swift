@@ -117,6 +117,18 @@ struct FloatingLyricsView: View {
         .animation(state.currentEasterEgg == .windowBounce ? .interpolatingSpring(stiffness: 100, damping: 0) : .spring(), value: state.currentEasterEgg)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: state.currentLyricIndex)
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: state.isMiniMode)
+        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+            for provider in providers {
+                _ = provider.loadObject(ofClass: URL.self) { url, error in
+                    if let url = url {
+                        DispatchQueue.main.async {
+                            state.addLocalTrack(url: url)
+                        }
+                    }
+                }
+            }
+            return true
+        }
     }
     
     @ViewBuilder
