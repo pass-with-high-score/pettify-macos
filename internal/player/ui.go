@@ -94,9 +94,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.volume = &effects.Volume{Streamer: m.ctrl, Base: 2, Volume: m.config.Volume, Silent: false}
 		
 		eq := effects.NewEqualizer(m.volume, m.format.SampleRate, effects.MonoEqualizerSections{
-			{F0: 100, Bf: 100, GB: 0, G0: 0, G: m.config.Bass},
-			{F0: 1000, Bf: 1000, GB: 0, G0: 0, G: m.config.Mid},
-			{F0: 10000, Bf: 10000, GB: 0, G0: 0, G: m.config.Treble},
+			{F0: 60, Bf: 60, GB: 0, G0: 0, G: m.config.Band60},
+			{F0: 250, Bf: 250, GB: 0, G0: 0, G: m.config.Band250},
+			{F0: 1000, Bf: 1000, GB: 0, G0: 0, G: m.config.Band1k},
+			{F0: 4000, Bf: 4000, GB: 0, G0: 0, G: m.config.Band4k},
+			{F0: 12000, Bf: 12000, GB: 0, G0: 0, G: m.config.Band12k},
 		})
 
 		m.visualizer = &Visualizer{streamer: eq}
@@ -149,21 +151,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				speaker.Unlock()
 				go saveConfig(m.config)
 			}
-		case "1", "2", "3", "4", "5", "6":
+		case "1", "2", "3", "4", "5", "6", "7", "8", "9", "0":
 			if m.volume != nil {
 				speaker.Lock()
 				switch msg.String() {
-				case "1": m.config.Bass -= 1
-				case "2": m.config.Bass += 1
-				case "3": m.config.Mid -= 1
-				case "4": m.config.Mid += 1
-				case "5": m.config.Treble -= 1
-				case "6": m.config.Treble += 1
+				case "1": m.config.Band60 -= 1
+				case "2": m.config.Band60 += 1
+				case "3": m.config.Band250 -= 1
+				case "4": m.config.Band250 += 1
+				case "5": m.config.Band1k -= 1
+				case "6": m.config.Band1k += 1
+				case "7": m.config.Band4k -= 1
+				case "8": m.config.Band4k += 1
+				case "9": m.config.Band12k -= 1
+				case "0": m.config.Band12k += 1
 				}
 				eq := effects.NewEqualizer(m.volume, m.format.SampleRate, effects.MonoEqualizerSections{
-					{F0: 100, Bf: 100, GB: 0, G0: 0, G: m.config.Bass},
-					{F0: 1000, Bf: 1000, GB: 0, G0: 0, G: m.config.Mid},
-					{F0: 10000, Bf: 10000, GB: 0, G0: 0, G: m.config.Treble},
+					{F0: 60, Bf: 60, GB: 0, G0: 0, G: m.config.Band60},
+					{F0: 250, Bf: 250, GB: 0, G0: 0, G: m.config.Band250},
+					{F0: 1000, Bf: 1000, GB: 0, G0: 0, G: m.config.Band1k},
+					{F0: 4000, Bf: 4000, GB: 0, G0: 0, G: m.config.Band4k},
+					{F0: 12000, Bf: 12000, GB: 0, G0: 0, G: m.config.Band12k},
 				})
 				m.visualizer.streamer = eq
 				speaker.Unlock()
@@ -332,7 +340,7 @@ func (m model) View() string {
 		
 		volInfo := ""
 		if m.volume != nil {
-			volInfo = fmt.Sprintf(" Vol: %.1f | EQ: B:%.0fdB M:%.0fdB T:%.0fdB", m.volume.Volume, m.config.Bass, m.config.Mid, m.config.Treble)
+			volInfo = fmt.Sprintf(" Vol: %.1f | EQ: 60Hz:%.0f 250Hz:%.0f 1k:%.0f 4k:%.0f 12k:%.0f", m.volume.Volume, m.config.Band60, m.config.Band250, m.config.Band1k, m.config.Band4k, m.config.Band12k)
 		}
 
 		statusInfo := fmt.Sprintf("%s  %s / %s %s %s", status, elapsed, total, modeInfo, volInfo)
@@ -369,7 +377,7 @@ func (m model) View() string {
 		}
 	}
 
-	s += helpStyle.Render("Space: Pause • N/P: Next/Prev • Left/Right: Seek • Up/Down: Vol • 1-6: EQ • /: Search • Q: Quit") + "\n"
+	s += helpStyle.Render("Space: Pause • N/P: Next/Prev • Left/Right: Seek • Up/Down: Vol • 1-0: EQ • /: Search • Q: Quit") + "\n"
 
 	return s
 }

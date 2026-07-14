@@ -7,10 +7,12 @@ import (
 )
 
 type Config struct {
-	Volume float64 `json:"volume"`
-	Bass   float64 `json:"bass"`
-	Mid    float64 `json:"mid"`
-	Treble float64 `json:"treble"`
+	Volume   float64 `json:"volume"`
+	Band60   float64 `json:"band_60"`
+	Band250  float64 `json:"band_250"`
+	Band1k   float64 `json:"band_1k"`
+	Band4k   float64 `json:"band_4k"`
+	Band12k  float64 `json:"band_12k"`
 }
 
 func getConfigPath() string {
