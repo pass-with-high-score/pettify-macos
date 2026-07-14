@@ -217,16 +217,12 @@ struct FloatingLyricsView: View {
     @ViewBuilder
     var infoText: some View {
         VStack(alignment: state.isLeft ? .leading : .trailing, spacing: 4) {
-            Text(state.status.title)
-                .font(.system(size: 16, weight: .bold))
+            MarqueeText(text: state.status.title, font: .system(size: 16, weight: .bold), containerWidth: 220, isLeft: state.isLeft)
                 .foregroundColor(.white)
-                .lineLimit(1)
             
             if state.status.artist != "" {
-                Text(state.status.artist)
-                    .font(.system(size: 13))
+                MarqueeText(text: state.status.artist, font: .system(size: 13), containerWidth: 220, isLeft: state.isLeft)
                     .foregroundColor(.white.opacity(0.8))
-                    .lineLimit(1)
             }
             
             HStack(spacing: 6) {
@@ -297,6 +293,58 @@ struct SpinningVinylView: View {
                 if state.currentEasterEgg == .reverseSpin { speed = -30.0 }
                 if state.currentEasterEgg == .djScratch { speed = (Int.random(in: 0...1) == 0 ? 50.0 : -50.0) }
                 rotation += speed
+            }
+        }
+    }
+}
+
+struct MarqueeText: View {
+    var text: String
+    var font: Font
+    var containerWidth: CGFloat
+    var isLeft: Bool
+    
+    @State private var offset: CGFloat = 0
+    @State private var textWidth: CGFloat = 0
+    @State private var id = UUID()
+    
+    var body: some View {
+        let isOversized = textWidth > containerWidth
+        let align: Alignment = isOversized ? .leading : (isLeft ? .leading : .trailing)
+        
+        Text(text)
+            .font(font)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .background(GeometryReader { geo in
+                Color.clear
+                    .onAppear {
+                        if textWidth != geo.size.width {
+                            textWidth = geo.size.width
+                            startAnimation()
+                        }
+                    }
+                    .onChange(of: text) { _ in
+                        offset = 0
+                        textWidth = 0
+                        id = UUID()
+                    }
+            })
+            .offset(x: isOversized ? offset : 0)
+            .frame(width: containerWidth, alignment: align)
+            .clipped()
+            .id(id)
+    }
+    
+    func startAnimation() {
+        if textWidth > containerWidth {
+            let distance = textWidth - containerWidth + 20
+            let duration = Double(distance) / 30.0
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                withAnimation(.linear(duration: duration).delay(1.0).repeatForever(autoreverses: true)) {
+                    self.offset = -distance
+                }
             }
         }
     }
