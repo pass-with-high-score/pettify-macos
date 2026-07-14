@@ -53,6 +53,7 @@ type model struct {
 	addInput       textinput.Model
 	searching      bool
 	adding         bool
+	addStatus      string
 	quitting       bool
 	loop           bool
 	shuffle        bool

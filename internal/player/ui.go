@@ -119,7 +119,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 				m.addInput.SetValue("")
-				m.err = fmt.Errorf("Searching/Adding track...")
+				m.addStatus = "Searching YouTube / Local..."
 				return m, addTrackCmd(val)
 			}
 		}
@@ -163,7 +163,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case trackAddedMsg:
-		m.err = nil // clear searching message
+		m.addStatus = "" // clear searching message
 		if msg.err != nil {
 			m.err = msg.err
 			return m, nil
@@ -436,6 +436,9 @@ func (m model) View() string {
 	} else if m.adding {
 		s += "\n Add Track: " + m.addInput.View() + "\n"
 	} else {
+		if m.addStatus != "" {
+			s += "\n ⏳ " + dimStyle.Render(m.addStatus) + "\n"
+		}
 		s += "\n" + dimStyle.Render("Playlist:") + "\n"
 		start := m.currentIndex - 2
 		if start < 0 { start = 0 }
