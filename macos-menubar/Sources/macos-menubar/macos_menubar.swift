@@ -170,7 +170,7 @@ class AppState: ObservableObject {
 }
 
 struct PopoverView: View {
-    @StateObject var state = AppState()
+    @ObservedObject var state: AppState
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
     var body: some View {
@@ -259,10 +259,46 @@ struct PopoverView: View {
             }
         }
         .padding(20)
-        .frame(width: 260, height: state.lyrics.isEmpty ? 320 : 380)
+        .frame(width: 260, height: state.lyrics.isEmpty ? 350 : 450)
         .background(VisualEffectView().edgesIgnoringSafeArea(.all))
         .onReceive(timer) { _ in state.fetch() }
         .onAppear { state.fetch() }
+    }
+}
+
+class FloatingLyricsWindow: NSWindow {
+    init(contentRect: NSRect, backing: NSWindow.BackingStoreType, defer flag: Bool) {
+        super.init(contentRect: contentRect, styleMask: .borderless, backing: backing, defer: flag)
+        self.level = .floating
+        self.backgroundColor = .clear
+        self.isOpaque = false
+        self.hasShadow = false
+        self.ignoresMouseEvents = true
+        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+    }
+}
+
+struct FloatingLyricsView: View {
+    @ObservedObject var state: AppState
+
+    var body: some View {
+        VStack {
+            if !state.lyrics.isEmpty && state.currentLyricIndex >= 0 && state.currentLyricIndex < state.lyrics.count {
+                Text(state.lyrics[state.currentLyricIndex].text)
+                    .font(.system(size: 36, weight: .black, design: .rounded))
+                    .foregroundColor(.white)
+                    .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 2)
+                    .shadow(color: .black.opacity(0.5), radius: 10, x: 0, y: 0)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(2)
+                    .id(state.lyrics[state.currentLyricIndex].id)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        .padding(.leading, 60)
+        .padding(.bottom, 60)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: state.currentLyricIndex)
     }
 }
 
@@ -289,15 +325,17 @@ struct MenuBarApp: App {
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
     var popover: NSPopover!
+    let state = AppState()
+    var floatingWindow: FloatingLyricsWindow!
     
     func applicationWillFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let contentView = PopoverView()
+        let contentView = PopoverView(state: state)
         popover = NSPopover()
-        popover.contentSize = NSSize(width: 260, height: 380)
+        popover.contentSize = NSSize(width: 260, height: 450)
         popover.behavior = .transient
         popover.contentViewController = NSHostingController(rootView: contentView)
         
@@ -306,6 +344,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             button.image = NSImage(systemSymbolName: "music.note", accessibilityDescription: "Audio CLI")
             button.action = #selector(togglePopover(_:))
         }
+        
+        let screenRect = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let floatingRect = NSRect(x: screenRect.minX, y: screenRect.minY, width: screenRect.width / 2, height: 300)
+        let floatingContentView = FloatingLyricsView(state: state)
+        floatingWindow = FloatingLyricsWindow(contentRect: floatingRect, backing: .buffered, defer: false)
+        floatingWindow.contentView = NSHostingView(rootView: floatingContentView)
+        floatingWindow.makeKeyAndOrderFront(nil)
     }
     
     @objc func togglePopover(_ sender: AnyObject?) {
