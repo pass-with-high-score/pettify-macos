@@ -62,13 +62,21 @@ struct PopoverView: View {
             // 2. Now Playing Card
             ZStack(alignment: .bottomLeading) {
                 if state.status.thumbnail != "" {
-                    AsyncImage(url: URL(string: state.status.thumbnail)) { phase in
-                        if let image = phase.image {
-                            image.resizable().aspectRatio(contentMode: .fill)
-                        } else {
-                            Color.black.opacity(0.3)
-                        }
-                    }.frame(width: 290, height: 164).clipped()
+                    if state.status.thumbnail.hasPrefix("file://"), let url = URL(string: state.status.thumbnail), let nsImage = NSImage(contentsOf: url) {
+                        Image(nsImage: nsImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 290, height: 164)
+                            .clipped()
+                    } else {
+                        AsyncImage(url: URL(string: state.status.thumbnail)) { phase in
+                            if let image = phase.image {
+                                image.resizable().aspectRatio(contentMode: .fill)
+                            } else {
+                                Color.black.opacity(0.3)
+                            }
+                        }.frame(width: 290, height: 164).clipped()
+                    }
                 } else {
                     Color.black.opacity(0.3).frame(width: 290, height: 164)
                     Image(systemName: "music.note")

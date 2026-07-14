@@ -283,14 +283,21 @@ struct SpinningVinylView: View {
     let timer = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
     
     var body: some View {
-        AsyncImage(url: URL(string: imageURL)) { phase in
-            if let image = phase.image {
-                image.resizable().aspectRatio(contentMode: .fill)
+        Group {
+            if imageURL.hasPrefix("file://"), let url = URL(string: imageURL), let nsImage = NSImage(contentsOf: url) {
+                Image(nsImage: nsImage)
+                    .resizable().aspectRatio(contentMode: .fill)
             } else {
-                ZStack {
-                    Color.white.opacity(0.1)
-                    Image(systemName: "music.note")
-                        .foregroundColor(.white.opacity(0.5))
+                AsyncImage(url: URL(string: imageURL)) { phase in
+                    if let image = phase.image {
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } else {
+                        ZStack {
+                            Color.white.opacity(0.1)
+                            Image(systemName: "music.note")
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+                    }
                 }
             }
         }
