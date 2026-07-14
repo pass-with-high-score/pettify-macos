@@ -16,6 +16,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var popover: NSPopover!
     let state = AppState()
     var floatingWindow: FloatingLyricsWindow!
+    var settingsWindow: NSWindow?
     
     func applicationWillFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -72,11 +73,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     @objc func openSettings() {
-        if #available(macOS 13.0, *) {
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-        } else {
-            NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+        if settingsWindow == nil {
+            let settingsView = SettingsView()
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 450, height: 300),
+                styleMask: [.titled, .closable, .miniaturizable],
+                backing: .buffered, defer: false)
+            window.center()
+            window.setFrameAutosaveName("Settings")
+            window.title = "Settings"
+            window.contentView = NSHostingView(rootView: settingsView)
+            window.isReleasedWhenClosed = false
+            settingsWindow = window
         }
+        
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindow?.makeKeyAndOrderFront(nil)
     }
     
     @objc func quitApp() {
