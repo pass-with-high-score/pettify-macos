@@ -3,7 +3,6 @@ package player
 import (
 	"bytes"
 	"fmt"
-	"math"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -44,98 +43,16 @@ var (
 			MarginTop(1)
 )
 
-type autoGain struct {
-	streamer beep.Streamer
-	gain     float64
-}
-
-func (g *autoGain) Stream(samples [][2]float64) (n int, ok bool) {
-	n, ok = g.streamer.Stream(samples)
-	for i := 0; i < n; i++ {
-		samples[i][0] *= g.gain
-		samples[i][1] *= g.gain
-	}
-	return n, ok
-}
-
-func (g *autoGain) Err() error {
-	return g.streamer.Err()
-}
-
-type limiter struct {
-	streamer beep.Streamer
-}
-
-func (l *limiter) Stream(samples [][2]float64) (n int, ok bool) {
-	n, ok = l.streamer.Stream(samples)
-	for i := 0; i < n; i++ {
-		for ch := 0; ch < 2; ch++ {
-			if samples[i][ch] > 0.99 {
-				samples[i][ch] = 0.99
-			} else if samples[i][ch] < -0.99 {
-				samples[i][ch] = -0.99
-			}
-		}
-	}
-	return n, ok
-}
-
-func (l *limiter) Err() error {
-	return l.streamer.Err()
-}
-
-func createEQ(base beep.Streamer, sampleRate beep.SampleRate, cfg Config) beep.Streamer {
-	var sections effects.MonoEqualizerSections
-	
-	addBand := func(f0, g float64) {
-		if g == 0 {
-			return
-		}
-		sections = append(sections, effects.MonoEqualizerSection{
-			F0: f0,
-			Bf: f0 / 1.414, // Constant Q factor of ~1.4 for musical, non-resonant bands
-			GB: g / 2.0,
-			G0: 0,
-			G:  g,
-		})
-	}
-	
-	addBand(60, cfg.Band60)
-	addBand(250, cfg.Band250)
-	addBand(1000, cfg.Band1k)
-	addBand(4000, cfg.Band4k)
-	addBand(12000, cfg.Band12k)
-	
-	if len(sections) == 0 {
-		return base
-	}
-	
-	maxBoost := 0.0
-	for _, g := range []float64{cfg.Band60, cfg.Band250, cfg.Band1k, cfg.Band4k, cfg.Band12k} {
-		if g > maxBoost {
-			maxBoost = g
-		}
-	}
-
-	var eqStreamer beep.Streamer = base
-	if maxBoost > 0 {
-		multiplier := math.Pow(10.0, -maxBoost/20.0)
-		eqStreamer = &autoGain{streamer: eqStreamer, gain: multiplier}
-	}
-	
-	return effects.NewEqualizer(eqStreamer, sampleRate, sections)
-}
+// Removed EQ and limiter logic to fix crackling issues.
 
 func (m *model) updateStreamer() {
 	if m.volume == nil || m.visualizer == nil {
 		return
 	}
-	eq := createEQ(m.volume, m.format.SampleRate, m.config)
-	limitedEq := &limiter{streamer: eq}
 	
-	var finalStreamer beep.Streamer = limitedEq
+	var finalStreamer beep.Streamer = m.volume
 	if m.format.SampleRate != m.initRate && m.initialized {
-		finalStreamer = beep.Resample(4, m.format.SampleRate, m.initRate, limitedEq)
+		finalStreamer = beep.Resample(4, m.format.SampleRate, m.initRate, m.volume)
 	}
 	m.visualizer.streamer = finalStreamer
 }
@@ -337,40 +254,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				speaker.Unlock()
 				go saveConfig(m.config)
 			}
-		case "1", "2", "3", "4", "5", "6", "7", "8", "9", "0":
-			if m.volume != nil {
-				speaker.Lock()
-				switch msg.String() {
-				case "1": m.config.Band60 -= 1
-				case "2": m.config.Band60 += 1
-				case "3": m.config.Band250 -= 1
-				case "4": m.config.Band250 += 1
-				case "5": m.config.Band1k -= 1
-				case "6": m.config.Band1k += 1
-				case "7": m.config.Band4k -= 1
-				case "8": m.config.Band4k += 1
-				case "9": m.config.Band12k -= 1
-				case "0": m.config.Band12k += 1
-				}
-				m.updateStreamer()
-				speaker.Unlock()
-				go saveConfig(m.config)
-			}
-		case "r", "R":
-			if m.volume != nil {
-				speaker.Lock()
-				m.volume.Volume = 0
-				m.config.Volume = 0
-				m.config.Band60 = 0
-				m.config.Band250 = 0
-				m.config.Band1k = 0
-				m.config.Band4k = 0
-				m.config.Band12k = 0
-				
-				m.updateStreamer()
-				speaker.Unlock()
-				go saveConfig(m.config)
-			}
 		case "j", "left":
 			if m.streamer != nil {
 				speaker.Lock()
@@ -534,7 +417,7 @@ func (m model) View() string {
 		
 		volInfo := ""
 		if m.volume != nil {
-			volInfo = fmt.Sprintf(" Vol: %.1f | EQ: 60Hz:%.0f 250Hz:%.0f 1k:%.0f 4k:%.0f 12k:%.0f", m.volume.Volume, m.config.Band60, m.config.Band250, m.config.Band1k, m.config.Band4k, m.config.Band12k)
+			volInfo = fmt.Sprintf(" Vol: %.1f", m.volume.Volume)
 		}
 
 		statusInfo := fmt.Sprintf("%s  %s / %s %s %s", status, elapsed, total, modeInfo, volInfo)
@@ -573,7 +456,7 @@ func (m model) View() string {
 		}
 	}
 
-	s += helpStyle.Render("Space: Pause • N/P: Next/Prev • Left/Right: Seek • Up/Down: Vol • 1-0: EQ • R: Reset • /: Search • A: Add • Q: Quit") + "\n"
+	s += helpStyle.Render("Space: Pause • N/P: Next/Prev • Left/Right: Seek • Up/Down: Vol • /: Search • A: Add • Q: Quit") + "\n"
 
 	return s
 }
