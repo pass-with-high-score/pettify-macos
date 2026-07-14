@@ -76,6 +76,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case loadMsg:
+		m.loading = false
 		if msg.err != nil {
 			m.err = msg.err
 			return m, tea.Quit
@@ -240,7 +241,9 @@ func (m model) View() string {
 
 	s := "\n" + titleStyle.Render("AUDIO PLAYER") + "\n\n"
 	
-	if len(m.filteredTracks) > 0 {
+	if m.loading {
+		s += " ⏳ Loading track... (Downloading from YouTube if needed)\n\n"
+	} else if len(m.filteredTracks) > 0 {
 		track := m.tracks[m.filteredTracks[m.currentIndex]]
 		displayTitle := track.Title
 		if track.Artist != "" {
@@ -308,7 +311,7 @@ func (m model) View() string {
 			statusInfo += fmt.Sprintf(" [A-B: %s-%s]", aTime, bTime)
 		}
 		s += statusStyle.Render(statusInfo) + "\n"
-	} else {
+	} else if !m.loading {
 		s += "No tracks found matching search.\n\n"
 	}
 

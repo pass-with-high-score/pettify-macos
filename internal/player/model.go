@@ -60,6 +60,7 @@ type model struct {
 	pointA         int
 	pointB         int
 	abActive       bool
+	loading        bool
 }
 
 type tickMsg time.Time

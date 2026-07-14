@@ -17,87 +17,111 @@ import (
 )
 
 func Run(path string, shuffleFlag bool, loopFlag bool) {
+	var tracks []Track
+	var filtered []int
+
 	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
 		if _, err := exec.LookPath("yt-dlp"); err != nil {
 			fmt.Println("❌ Error: yt-dlp is not installed or not in PATH.")
 			fmt.Println("Please install it from: https://github.com/yt-dlp/yt-dlp#installation")
 			os.Exit(1)
 		}
-		tempDir, err := os.MkdirTemp("", "audio-cli-yt-*")
+		
+		fmt.Println("⏳ Fetching playlist info... Please wait.")
+		cmd := exec.Command("yt-dlp", "--flat-playlist", "--print", "%(title)s|%(url)s|%(uploader)s", path)
+		out, err := cmd.Output()
 		if err != nil {
-			log.Fatalf("Failed to create temp directory: %v", err)
+			log.Fatalf("Failed to fetch playlist: %v", err)
 		}
-		fmt.Println("⏳ Downloading audio using yt-dlp... Please wait.")
-		fmt.Printf("URL: %s\n\n", path)
-		cmd := exec.Command("yt-dlp", "-x", "--audio-format", "mp3", "-o", filepath.Join(tempDir, "%(autonumber)03d_%(title)s.%(ext)s"), path)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			log.Fatalf("yt-dlp failed: %v", err)
-		}
-		fmt.Println("\n✅ Download complete! Starting player...")
-		path = tempDir
-	}
-
-	var files []string
-	info, err := os.Stat(path)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	supportedExts := map[string]bool{
-		".mp3":  true,
-		".wav":  true,
-		".ogg":  true,
-		".flac": true,
-	}
-
-	if info.IsDir() {
-		entries, err := os.ReadDir(path)
-		if err != nil {
-			log.Fatal(err)
-		}
-		for _, entry := range entries {
-			if !entry.IsDir() {
-				ext := strings.ToLower(filepath.Ext(entry.Name()))
-				if supportedExts[ext] {
-					files = append(files, filepath.Join(path, entry.Name()))
+		
+		lines := strings.Split(string(out), "\n")
+		for i, line := range lines {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			parts := strings.Split(line, "|")
+			if len(parts) >= 2 {
+				title := parts[0]
+				url := parts[1]
+				if !strings.HasPrefix(url, "http") {
+					url = "https://youtu.be/" + url
 				}
+				artist := ""
+				if len(parts) >= 3 {
+					artist = parts[2]
+				}
+				tracks = append(tracks, Track{
+					Path:   url,
+					Title:  title,
+					Artist: artist,
+				})
+				filtered = append(filtered, i)
 			}
 		}
 	} else {
-		files = append(files, path)
-	}
-
-	if len(files) == 0 {
-		fmt.Println("No supported audio files found (.mp3, .wav, .ogg, .flac).")
-		os.Exit(1)
-	}
-
-	rand.Seed(time.Now().UnixNano())
-	if shuffleFlag {
-		rand.Shuffle(len(files), func(i, j int) {
-			files[i], files[j] = files[j], files[i]
-		})
-	}
-
-	var tracks []Track
-	var filtered []int
-	for i, f := range files {
-		track := Track{Path: f, Title: filepath.Base(f)}
-		file, err := os.Open(f)
-		if err == nil {
-			m, err := tag.ReadFrom(file)
-			if err == nil {
-				if m.Title() != "" {
-					track.Title = m.Title()
-				}
-				track.Artist = m.Artist()
-			}
-			file.Close()
+		var files []string
+		info, err := os.Stat(path)
+		if err != nil {
+			log.Fatal(err)
 		}
-		tracks = append(tracks, track)
-		filtered = append(filtered, i)
+
+		supportedExts := map[string]bool{
+			".mp3":  true,
+			".wav":  true,
+			".ogg":  true,
+			".flac": true,
+		}
+
+		if info.IsDir() {
+			entries, err := os.ReadDir(path)
+			if err != nil {
+				log.Fatal(err)
+			}
+			for _, entry := range entries {
+				if !entry.IsDir() {
+					ext := strings.ToLower(filepath.Ext(entry.Name()))
+					if supportedExts[ext] {
+						files = append(files, filepath.Join(path, entry.Name()))
+					}
+				}
+			}
+		} else {
+			files = append(files, path)
+		}
+
+		if len(files) == 0 {
+			fmt.Println("No supported audio files found (.mp3, .wav, .ogg, .flac).")
+			os.Exit(1)
+		}
+
+		rand.Seed(time.Now().UnixNano())
+		if shuffleFlag {
+			rand.Shuffle(len(files), func(i, j int) {
+				files[i], files[j] = files[j], files[i]
+			})
+		}
+
+		for i, f := range files {
+			track := Track{Path: f, Title: filepath.Base(f)}
+			file, err := os.Open(f)
+			if err == nil {
+				m, err := tag.ReadFrom(file)
+				if err == nil {
+					if m.Title() != "" {
+						track.Title = m.Title()
+					}
+					track.Artist = m.Artist()
+				}
+				file.Close()
+			}
+			tracks = append(tracks, track)
+			filtered = append(filtered, i)
+		}
+	}
+
+	if len(tracks) == 0 {
+		fmt.Println("No tracks found.")
+		os.Exit(1)
 	}
 
 	ti := textinput.New()
@@ -112,6 +136,7 @@ func Run(path string, shuffleFlag bool, loopFlag bool) {
 		searchBar:      ti,
 		loop:           loopFlag,
 		shuffle:        shuffleFlag,
+		loading:        true,
 	}
 
 	if _, err := tea.NewProgram(m).Run(); err != nil {
