@@ -24,6 +24,8 @@ class AppState: ObservableObject {
     @Published var status = TrackStatus(title: "Loading...", artist: "", thumbnail: "", paused: false, volume: 1.0, percent: 0, position: 0, duration: 0)
     @Published var lyrics: [LyricLine] = []
     @Published var currentLyricIndex: Int = -1
+    @Published var isTop: Bool = false
+    @Published var isLeft: Bool = true
     var lastSearchedTitle: String = ""
     
     init() {
@@ -285,110 +287,185 @@ struct PopoverView: View {
 }
 
 class FloatingLyricsWindow: NSWindow {
+    var state: AppState?
+    var initialLocation: NSPoint?
+    
     init(contentRect: NSRect, backing: NSWindow.BackingStoreType, defer flag: Bool) {
         super.init(contentRect: contentRect, styleMask: .borderless, backing: backing, defer: flag)
         self.level = .floating
         self.backgroundColor = .clear
         self.isOpaque = false
         self.hasShadow = false
-        self.isMovableByWindowBackground = true // Allows dragging
         self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+    }
+    
+    override func mouseDown(with event: NSEvent) {
+        self.initialLocation = event.locationInWindow
+    }
+    
+    override func mouseDragged(with event: NSEvent) {
+        guard let initial = initialLocation else { return }
+        let screenLocation = NSEvent.mouseLocation
+        self.setFrameOrigin(NSPoint(x: screenLocation.x - initial.x, y: screenLocation.y - initial.y))
+    }
+    
+    override func mouseUp(with event: NSEvent) {
+        snapToCorner()
+    }
+    
+    func snapToCorner() {
+        guard let screen = self.screen else { return }
+        let screenRect = screen.visibleFrame
+        let windowRect = self.frame
+        let padding: CGFloat = 60
+        
+        let midX = windowRect.midX
+        let midY = windowRect.midY
+        
+        let isLeft = midX < screenRect.midX
+        let isTop = midY > screenRect.midY
+        
+        let targetX: CGFloat = isLeft ? screenRect.minX + padding : screenRect.maxX - windowRect.width - padding
+        let targetY: CGFloat = isTop ? screenRect.maxY - windowRect.height - padding : screenRect.minY + padding
+        
+        DispatchQueue.main.async {
+            self.state?.isTop = isTop
+            self.state?.isLeft = isLeft
+        }
+        
+        let targetFrame = NSRect(x: targetX, y: targetY, width: windowRect.width, height: windowRect.height)
+        
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.4
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            self.animator().setFrame(targetFrame, display: true)
+        }, completionHandler: nil)
     }
 }
 
 struct FloatingLyricsView: View {
     @ObservedObject var state: AppState
 
+    var alignment: Alignment {
+        switch (state.isTop, state.isLeft) {
+        case (true, true): return .topLeading
+        case (true, false): return .topTrailing
+        case (false, true): return .bottomLeading
+        case (false, false): return .bottomTrailing
+        }
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if !state.lyrics.isEmpty && state.currentLyricIndex >= 0 {
-                if state.currentLyricIndex - 1 >= 0 {
-                    Text(state.lyrics[state.currentLyricIndex - 1].text)
-                        .font(.system(size: 24, weight: .semibold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.4))
-                        .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 2)
-                        .multilineTextAlignment(.leading)
-                        .lineLimit(1)
-                }
-                
-                if state.currentLyricIndex < state.lyrics.count {
-                    Text(state.lyrics[state.currentLyricIndex].text)
-                        .font(.system(size: 36, weight: .black, design: .rounded))
-                        .foregroundColor(.white)
-                        .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 2)
-                        .shadow(color: .black.opacity(0.5), radius: 10, x: 0, y: 0)
-                        .multilineTextAlignment(.leading)
-                        .lineLimit(2)
-                        .id(state.lyrics[state.currentLyricIndex].id)
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
-                }
-                
-                if state.currentLyricIndex + 1 < state.lyrics.count {
-                    Text(state.lyrics[state.currentLyricIndex + 1].text)
-                        .font(.system(size: 24, weight: .semibold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.4))
-                        .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 2)
-                        .multilineTextAlignment(.leading)
-                        .lineLimit(1)
-                }
-            }
-            
-            Spacer().frame(height: 10)
-            
-            if state.status.title != "Loading..." {
-                HStack(spacing: 12) {
-                    if state.status.thumbnail != "" {
-                        AsyncImage(url: URL(string: state.status.thumbnail)) { phase in
-                            if let image = phase.image {
-                                image.resizable().aspectRatio(contentMode: .fill)
-                            } else {
-                                Color.gray.opacity(0.3)
-                            }
-                        }.frame(width: 40, height: 40).cornerRadius(6)
-                    } else {
-                        Image(systemName: "music.note.list")
-                            .font(.system(size: 20))
-                            .foregroundColor(.white)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(state.status.title)
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                        if state.status.artist != "" {
-                            Text(state.status.artist)
-                                .font(.system(size: 13))
-                                .foregroundColor(.white.opacity(0.8))
-                                .lineLimit(1)
-                        }
-                        
-                        // Mini progress bar for Desktop Lyrics
-                        HStack(spacing: 6) {
-                            Text(state.formatTime(state.status.position))
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .foregroundColor(.white.opacity(0.8))
-                            
-                            ProgressView(value: state.status.position, total: max(0.1, state.status.duration))
-                                .progressViewStyle(LinearProgressViewStyle(tint: .white))
-                                .frame(width: 120)
-                            
-                            Text(state.formatTime(state.status.duration))
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .foregroundColor(.white.opacity(0.8))
-                        }
-                        .padding(.top, 2)
-                    }
-                }
-                .padding(12)
-                .background(VisualEffectView().cornerRadius(12).opacity(0.9))
-                .shadow(color: .black.opacity(0.5), radius: 5, x: 0, y: 2)
+        VStack(alignment: state.isLeft ? .leading : .trailing, spacing: 12) {
+            if state.isTop {
+                songInfo
+                Spacer().frame(height: 10)
+                lyricsContent
+            } else {
+                lyricsContent
+                Spacer().frame(height: 10)
+                songInfo
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-        .padding(.leading, 60)
-        .padding(.bottom, 60)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
+        .padding(20)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: state.currentLyricIndex)
+        .animation(.easeInOut(duration: 0.4), value: state.isTop)
+        .animation(.easeInOut(duration: 0.4), value: state.isLeft)
+    }
+    
+    @ViewBuilder
+    var lyricsContent: some View {
+        if !state.lyrics.isEmpty && state.currentLyricIndex >= 0 {
+            if state.currentLyricIndex - 1 >= 0 {
+                Text(state.lyrics[state.currentLyricIndex - 1].text)
+                    .font(.system(size: 24, weight: .semibold, design: .rounded))
+                    .foregroundColor(.white.opacity(0.4))
+                    .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 2)
+                    .multilineTextAlignment(state.isLeft ? .leading : .trailing)
+                    .lineLimit(1)
+            }
+            
+            if state.currentLyricIndex < state.lyrics.count {
+                Text(state.lyrics[state.currentLyricIndex].text)
+                    .font(.system(size: 36, weight: .black, design: .rounded))
+                    .foregroundColor(.white)
+                    .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 2)
+                    .shadow(color: .black.opacity(0.5), radius: 10, x: 0, y: 0)
+                    .multilineTextAlignment(state.isLeft ? .leading : .trailing)
+                    .lineLimit(2)
+                    .id(state.lyrics[state.currentLyricIndex].id)
+                    .transition(.opacity.combined(with: .move(edge: state.isTop ? .top : .bottom)))
+            }
+            
+            if state.currentLyricIndex + 1 < state.lyrics.count {
+                Text(state.lyrics[state.currentLyricIndex + 1].text)
+                    .font(.system(size: 24, weight: .semibold, design: .rounded))
+                    .foregroundColor(.white.opacity(0.4))
+                    .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 2)
+                    .multilineTextAlignment(state.isLeft ? .leading : .trailing)
+                    .lineLimit(1)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    var songInfo: some View {
+        if state.status.title != "Loading..." {
+            HStack(spacing: 12) {
+                if !state.isLeft { infoText }
+                
+                if state.status.thumbnail != "" {
+                    AsyncImage(url: URL(string: state.status.thumbnail)) { phase in
+                        if let image = phase.image {
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } else {
+                            Color.gray.opacity(0.3)
+                        }
+                    }.frame(width: 40, height: 40).cornerRadius(6)
+                } else {
+                    Image(systemName: "music.note.list")
+                        .font(.system(size: 20))
+                        .foregroundColor(.white)
+                }
+                
+                if state.isLeft { infoText }
+            }
+            .padding(12)
+            .background(VisualEffectView().cornerRadius(12).opacity(0.9))
+            .shadow(color: .black.opacity(0.5), radius: 5, x: 0, y: 2)
+        }
+    }
+    
+    @ViewBuilder
+    var infoText: some View {
+        VStack(alignment: state.isLeft ? .leading : .trailing, spacing: 4) {
+            Text(state.status.title)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+            if state.status.artist != "" {
+                Text(state.status.artist)
+                    .font(.system(size: 13))
+                    .foregroundColor(.white.opacity(0.8))
+                    .lineLimit(1)
+            }
+            
+            HStack(spacing: 6) {
+                Text(state.formatTime(state.status.position))
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.8))
+                
+                ProgressView(value: state.status.position, total: max(0.1, state.status.duration))
+                    .progressViewStyle(LinearProgressViewStyle(tint: .white))
+                    .frame(width: 120)
+                
+                Text(state.formatTime(state.status.duration))
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.8))
+            }
+            .padding(.top, 2)
+        }
     }
 }
 
@@ -439,8 +516,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let floatingRect = NSRect(x: screenRect.minX, y: screenRect.minY, width: screenRect.width / 2, height: 500)
         let floatingContentView = FloatingLyricsView(state: state)
         floatingWindow = FloatingLyricsWindow(contentRect: floatingRect, backing: .buffered, defer: false)
+        floatingWindow.state = state
         floatingWindow.contentView = NSHostingView(rootView: floatingContentView)
         floatingWindow.makeKeyAndOrderFront(nil)
+        floatingWindow.snapToCorner() // Initialize position
     }
     
     @objc func togglePopover(_ sender: AnyObject?) {
