@@ -210,6 +210,27 @@ class AppState: ObservableObject {
                 }
             }
             
+            if artist == "Local File" {
+                let parts = title.components(separatedBy: "-")
+                if parts.count >= 2 {
+                    artist = parts[0].trimmingCharacters(in: .whitespaces)
+                    title = parts[1...].joined(separator: "-").trimmingCharacters(in: .whitespaces)
+                }
+            }
+            
+            if artworkUrl == nil {
+                // Try fetching artwork from iTunes
+                let term = "\(title) \(artist)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+                if let url = URL(string: "https://itunes.apple.com/search?term=\(term)&media=music&entity=song&limit=1"),
+                   let (data, _) = try? await URLSession.shared.data(from: url),
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let results = json["results"] as? [[String: Any]],
+                   let first = results.first,
+                   let artUrl = first["artworkUrl100"] as? String {
+                    artworkUrl = artUrl.replacingOccurrences(of: "100x100bb", with: "600x600bb")
+                }
+            }
+            
             let trackInfo = TrackInfo(title: title, videoId: "", url: url.absoluteString, artist: artist, localThumbnailURL: artworkUrl)
             
             await MainActor.run {
