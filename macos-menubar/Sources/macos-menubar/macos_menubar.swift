@@ -148,6 +148,14 @@ class AppState: ObservableObject {
         }
     }
     
+    func formatTime(_ seconds: Double) -> String {
+        guard !seconds.isNaN && !seconds.isInfinite else { return "0:00" }
+        let totalSeconds = Int(seconds)
+        let m = totalSeconds / 60
+        let s = totalSeconds % 60
+        return String(format: "%d:%02d", m, s)
+    }
+    
     func setupRemoteTransportControls() {
         let commandCenter = MPRemoteCommandCenter.shared()
         commandCenter.playCommand.addTarget { [unowned self] event in
@@ -223,7 +231,7 @@ struct PopoverView: View {
             }
             
             HStack(spacing: 8) {
-                Text(formatTime(state.status.position))
+                Text(state.formatTime(state.status.position))
                     .font(.caption2.monospacedDigit())
                     .foregroundColor(.secondary)
                     
@@ -236,7 +244,7 @@ struct PopoverView: View {
                 .controlSize(.small)
                 .tint(.accentColor)
                 
-                Text(formatTime(state.status.duration))
+                Text(state.formatTime(state.status.duration))
                     .font(.caption2.monospacedDigit())
                     .foregroundColor(.secondary)
             }
@@ -274,14 +282,6 @@ struct PopoverView: View {
         .onReceive(timer) { _ in state.fetch() }
         .onAppear { state.fetch() }
     }
-    
-    func formatTime(_ seconds: Double) -> String {
-        guard !seconds.isNaN && !seconds.isInfinite else { return "0:00" }
-        let totalSeconds = Int(seconds)
-        let m = totalSeconds / 60
-        let s = totalSeconds % 60
-        return String(format: "%d:%02d", m, s)
-    }
 }
 
 class FloatingLyricsWindow: NSWindow {
@@ -291,7 +291,7 @@ class FloatingLyricsWindow: NSWindow {
         self.backgroundColor = .clear
         self.isOpaque = false
         self.hasShadow = false
-        self.ignoresMouseEvents = true
+        self.isMovableByWindowBackground = true // Allows dragging
         self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
     }
 }
@@ -351,7 +351,7 @@ struct FloatingLyricsView: View {
                             .foregroundColor(.white)
                     }
                     
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(state.status.title)
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.white)
@@ -362,9 +362,25 @@ struct FloatingLyricsView: View {
                                 .foregroundColor(.white.opacity(0.8))
                                 .lineLimit(1)
                         }
+                        
+                        // Mini progress bar for Desktop Lyrics
+                        HStack(spacing: 6) {
+                            Text(state.formatTime(state.status.position))
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.8))
+                            
+                            ProgressView(value: state.status.position, total: max(0.1, state.status.duration))
+                                .progressViewStyle(LinearProgressViewStyle(tint: .white))
+                                .frame(width: 120)
+                            
+                            Text(state.formatTime(state.status.duration))
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                        .padding(.top, 2)
                     }
                 }
-                .padding(10)
+                .padding(12)
                 .background(VisualEffectView().cornerRadius(12).opacity(0.9))
                 .shadow(color: .black.opacity(0.5), radius: 5, x: 0, y: 2)
             }
