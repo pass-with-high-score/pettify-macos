@@ -39,7 +39,7 @@ func Run(path string, shuffleFlag bool, loopFlag bool) {
 		}
 		
 		lines := strings.Split(stdout.String(), "\n")
-		for i, line := range lines {
+		for _, line := range lines {
 			if strings.TrimSpace(line) == "" {
 				continue
 			}
