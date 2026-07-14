@@ -15,50 +15,129 @@ struct SettingsView: View {
     @AppStorage("maxCacheSizeGB") private var maxCacheSizeGB = 2.0
     
     @State private var cacheSize: String = "Calculating..."
+    @State private var selectedTab: String = "general"
     
     var body: some View {
-        TabView {
-            // General Tab
-            Form {
-                Toggle("Launch at Login", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { newValue in
-                        if #available(macOS 13.0, *) {
-                            if newValue {
-                                try? SMAppService.mainApp.register()
-                            } else {
-                                try? SMAppService.mainApp.unregister()
+        HStack(spacing: 0) {
+            // Sidebar
+            VStack(alignment: .leading, spacing: 5) {
+                SidebarItem(title: "General", icon: "gear", isSelected: selectedTab == "general") { selectedTab = "general" }
+                SidebarItem(title: "Appearance", icon: "paintpalette", isSelected: selectedTab == "appearance") { selectedTab = "appearance" }
+                SidebarItem(title: "Playback", icon: "play.circle", isSelected: selectedTab == "playback") { selectedTab = "playback" }
+                SidebarItem(title: "Storage", icon: "externaldrive", isSelected: selectedTab == "storage") { selectedTab = "storage" }
+                Spacer()
+            }
+            .padding(.top, 20)
+            .padding(.horizontal, 10)
+            .frame(width: 160)
+            .background(VisualEffectView().edgesIgnoringSafeArea(.all)) // Translucent sidebar
+            
+            Divider()
+            
+            // Content
+            ScrollView {
+                VStack(alignment: .leading) {
+                    switch selectedTab {
+                    case "general":
+                        generalContent
+                    case "appearance":
+                        appearanceContent
+                    case "playback":
+                        playbackContent
+                    case "storage":
+                        storageContent
+                    default:
+                        EmptyView()
+                    }
+                }
+                .padding(30)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(NSColor.windowBackgroundColor))
+        }
+        .frame(width: 600, height: 400)
+    }
+    
+    // MARK: - Sidebar Item Component
+    struct SidebarItem: View {
+        let title: String
+        let icon: String
+        let isSelected: Bool
+        let action: () -> Void
+        
+        var body: some View {
+            Button(action: action) {
+                HStack {
+                    Image(systemName: icon)
+                        .frame(width: 20)
+                        .foregroundColor(isSelected ? .white : .primary)
+                    Text(title)
+                        .foregroundColor(isSelected ? .white : .primary)
+                    Spacer()
+                }
+                .padding(.vertical, 6)
+                .padding(.horizontal, 10)
+                .background(isSelected ? Color.accentColor : Color.clear)
+                .cornerRadius(6)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+    
+    // MARK: - Tab Contents
+    
+    private var generalContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("General").font(.title2).bold()
+            
+            GroupBox {
+                VStack(alignment: .leading, spacing: 12) {
+                    Toggle("Launch at Login", isOn: $launchAtLogin)
+                        .onChange(of: launchAtLogin) { newValue in
+                            if #available(macOS 13.0, *) {
+                                if newValue {
+                                    try? SMAppService.mainApp.register()
+                                } else {
+                                    try? SMAppService.mainApp.unregister()
+                                }
                             }
                         }
-                    }
-                
-                Toggle("Show Dock Icon (requires app restart)", isOn: $showDockIcon)
-                    .onChange(of: showDockIcon) { newValue in
-                        let alert = NSAlert()
-                        alert.messageText = "Restart Required"
-                        alert.informativeText = "Please restart Audio CLI for the Dock Icon setting to take effect."
-                        alert.alertStyle = .informational
-                        alert.addButton(withTitle: "OK")
-                        alert.runModal()
-                    }
-                
-                Toggle("Show Floating Lyrics Window", isOn: $showFloatingLyrics)
-                    .onChange(of: showFloatingLyrics) { newValue in
-                        NotificationCenter.default.post(name: NSNotification.Name("ToggleFloatingLyrics"), object: newValue)
-                    }
+                    
+                    Toggle("Show Dock Icon (requires app restart)", isOn: $showDockIcon)
+                        .onChange(of: showDockIcon) { _ in
+                            let alert = NSAlert()
+                            alert.messageText = "Restart Required"
+                            alert.informativeText = "Please restart Audio CLI for the Dock Icon setting to take effect."
+                            alert.alertStyle = .informational
+                            alert.addButton(withTitle: "OK")
+                            alert.runModal()
+                        }
+                    
+                    Toggle("Show Floating Lyrics Window", isOn: $showFloatingLyrics)
+                        .onChange(of: showFloatingLyrics) { newValue in
+                            NotificationCenter.default.post(name: NSNotification.Name("ToggleFloatingLyrics"), object: newValue)
+                        }
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(20)
-            .tabItem { Label("General", systemImage: "gear") }
+        }
+    }
+    
+    private var appearanceContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Appearance").font(.title2).bold()
             
-            // Appearance Tab
-            Form {
-                VStack(alignment: .leading, spacing: 15) {
-                    VStack(alignment: .leading) {
-                        Text("Floating Lyrics Opacity: \(Int(floatingOpacity * 100))%")
+            GroupBox {
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Floating Lyrics Opacity: \(Int(floatingOpacity * 100))%").bold()
                         Slider(value: $floatingOpacity, in: 0.1...1.0, step: 0.05)
                     }
                     
-                    VStack(alignment: .leading) {
-                        Text("Floating Lyrics Font Size: \(Int(floatingFontSize))")
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Floating Lyrics Font Size: \(Int(floatingFontSize))").bold()
                         Picker("", selection: $floatingFontSize) {
                             Text("Small").tag(24.0)
                             Text("Medium").tag(36.0)
@@ -68,64 +147,78 @@ struct SettingsView: View {
                         .pickerStyle(.segmented)
                     }
                 }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(20)
-            .tabItem { Label("Appearance", systemImage: "paintpalette") }
+        }
+    }
+    
+    private var playbackContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Playback").font(.title2).bold()
             
-            // Playback Tab
-            Form {
-                VStack(alignment: .leading, spacing: 15) {
-                    VStack(alignment: .leading) {
-                        Text("Audio Quality (yt-dlp)")
+            GroupBox {
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Audio Quality (yt-dlp)").bold()
                         Picker("", selection: $audioQuality) {
-                            Text("Best Audio").tag("bestaudio")
-                            Text("256 kbps").tag("256k")
+                            Text("Best Audio (Recommended)").tag("bestaudio")
+                            Text("256 kbps (High Quality)").tag("256k")
                             Text("128 kbps (Data Saver)").tag("128k")
                         }
                         .pickerStyle(.menu)
                     }
                     
-                    VStack(alignment: .leading) {
-                        Text("Default Startup Volume: \(Int(defaultVolume * 100))%")
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Default Startup Volume: \(Int(defaultVolume * 100))%").bold()
                         Slider(value: $defaultVolume, in: 0.0...1.0, step: 0.05)
                     }
                 }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(20)
-            .tabItem { Label("Playback", systemImage: "play.circle") }
+        }
+    }
+    
+    private var storageContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Storage & Cache").font(.title2).bold()
             
-            // Storage Tab
-            Form {
-                VStack(alignment: .leading, spacing: 15) {
+            GroupBox {
+                VStack(alignment: .leading, spacing: 20) {
                     HStack {
-                        Text("Current Audio Cache:")
+                        Text("Current Audio Cache:").bold()
                         Spacer()
                         Text(cacheSize)
                             .foregroundColor(.secondary)
                     }
+                    .onAppear(perform: calculateCacheSize)
                     
-                    VStack(alignment: .leading) {
-                        Text("Max Auto-Cleanup Size: \(String(format: "%.1f", maxCacheSizeGB)) GB")
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Max Auto-Cleanup Size: \(String(format: "%.1f", maxCacheSizeGB)) GB").bold()
                         Slider(value: $maxCacheSizeGB, in: 0.5...10.0, step: 0.5)
-                        Text("When the cache exceeds this limit, older songs will be automatically deleted.")
+                        Text("When the cache exceeds this limit, older downloaded songs will be automatically deleted to save space.")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
                     
-                    Button("Clear Cache Now") {
-                        clearCache()
+                    Button(action: clearCache) {
+                        Text("Clear Cache Now")
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.red)
+                            .cornerRadius(6)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.red)
+                    .buttonStyle(.plain)
                 }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(20)
-            .tabItem { Label("Storage", systemImage: "externaldrive") }
-            .onAppear(perform: calculateCacheSize)
         }
-        .padding()
-        .frame(width: 480, height: 320)
     }
+    
+    // MARK: - Helpers
     
     private func calculateCacheSize() {
         let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!.appendingPathComponent("audio-cli-yt")
