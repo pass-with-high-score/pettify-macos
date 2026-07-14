@@ -110,6 +110,9 @@ struct OnekoView: View {
                 catPos.x = size.width + 16
                 direction = .down
                 maybeSleep()
+            } else if catPos.x <= -16 {
+                catPos.x = -16
+                direction = .up
             }
         case .down:
             frameNo = (frameNo == 9) ? 10 : 9 // Down frames
@@ -118,6 +121,9 @@ struct OnekoView: View {
                 catPos.y = size.height + 16
                 direction = .left
                 maybeSleep()
+            } else if catPos.y <= -16 {
+                catPos.y = -16
+                direction = .right
             }
         case .left:
             frameNo = (frameNo == 13) ? 14 : 13 // Left frames
@@ -126,6 +132,9 @@ struct OnekoView: View {
                 catPos.x = -16
                 direction = .up
                 maybeSleep()
+            } else if catPos.x >= size.width + 16 {
+                catPos.x = size.width + 16
+                direction = .down
             }
         case .up:
             frameNo = (frameNo == 1) ? 2 : 1 // Up frames
@@ -134,6 +143,9 @@ struct OnekoView: View {
                 catPos.y = -16
                 direction = .right
                 maybeSleep()
+            } else if catPos.y >= size.height + 16 {
+                catPos.y = size.height + 16
+                direction = .left
             }
         }
     }
