@@ -198,9 +198,9 @@ struct FloatingLyricsView: View {
                 }
                 .foregroundColor(.white)
                 .padding(.top, 4)
-                .opacity(isHovering ? 1.0 : 0.0)
-                .allowsHitTesting(isHovering)
-                .animation(.easeInOut(duration: 0.2), value: isHovering)
+                .opacity(isHovering ? 1.0 : 0.3)
+                .scaleEffect(isHovering ? 1.0 : 0.95)
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovering)
             }
             .padding(12)
             .background(
