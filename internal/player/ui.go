@@ -92,7 +92,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 		m.ctrl = &beep.Ctrl{Streamer: m.streamer, Paused: false}
 		m.volume = &effects.Volume{Streamer: m.ctrl, Base: 2, Volume: m.config.Volume, Silent: false}
-		m.visualizer = &Visualizer{streamer: m.volume}
+		
+		eq := effects.NewEqualizer(m.volume, m.format.SampleRate, effects.MonoEqualizerSections{
+			{F0: 100, Bf: 100, GB: 0, G0: 0, G: m.config.Bass},
+			{F0: 1000, Bf: 1000, GB: 0, G0: 0, G: m.config.Mid},
+			{F0: 10000, Bf: 10000, GB: 0, G0: 0, G: m.config.Treble},
+		})
+
+		m.visualizer = &Visualizer{streamer: eq}
 
 		if !m.initialized {
 			speaker.Init(m.format.SampleRate, m.format.SampleRate.N(time.Second/10))
@@ -139,6 +146,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				speaker.Lock()
 				m.volume.Volume -= 0.1
 				m.config.Volume = m.volume.Volume
+				speaker.Unlock()
+				go saveConfig(m.config)
+			}
+		case "1", "2", "3", "4", "5", "6":
+			if m.volume != nil {
+				speaker.Lock()
+				switch msg.String() {
+				case "1": m.config.Bass -= 1
+				case "2": m.config.Bass += 1
+				case "3": m.config.Mid -= 1
+				case "4": m.config.Mid += 1
+				case "5": m.config.Treble -= 1
+				case "6": m.config.Treble += 1
+				}
+				eq := effects.NewEqualizer(m.volume, m.format.SampleRate, effects.MonoEqualizerSections{
+					{F0: 100, Bf: 100, GB: 0, G0: 0, G: m.config.Bass},
+					{F0: 1000, Bf: 1000, GB: 0, G0: 0, G: m.config.Mid},
+					{F0: 10000, Bf: 10000, GB: 0, G0: 0, G: m.config.Treble},
+				})
+				m.visualizer.streamer = eq
 				speaker.Unlock()
 				go saveConfig(m.config)
 			}
@@ -305,7 +332,7 @@ func (m model) View() string {
 		
 		volInfo := ""
 		if m.volume != nil {
-			volInfo = fmt.Sprintf(" Vol: %.1f", m.volume.Volume)
+			volInfo = fmt.Sprintf(" Vol: %.1f | EQ: B:%.0fdB M:%.0fdB T:%.0fdB", m.volume.Volume, m.config.Bass, m.config.Mid, m.config.Treble)
 		}
 
 		statusInfo := fmt.Sprintf("%s  %s / %s %s %s", status, elapsed, total, modeInfo, volInfo)
@@ -342,7 +369,7 @@ func (m model) View() string {
 		}
 	}
 
-	s += helpStyle.Render("Space: Pause • N/P: Next/Prev • Left/Right: Seek • Up/Down: Vol • []: A-B • \\: Clear • /: Search • Q: Quit") + "\n"
+	s += helpStyle.Render("Space: Pause • N/P: Next/Prev • Left/Right: Seek • Up/Down: Vol • 1-6: EQ • /: Search • Q: Quit") + "\n"
 
 	return s
 }

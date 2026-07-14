@@ -8,6 +8,9 @@ import (
 
 type Config struct {
 	Volume float64 `json:"volume"`
+	Bass   float64 `json:"bass"`
+	Mid    float64 `json:"mid"`
+	Treble float64 `json:"treble"`
 }
 
 func getConfigPath() string {
