@@ -288,6 +288,31 @@ struct PopoverView: View {
     }
 }
 
+struct AudioVisualizerView: View {
+    var isPlaying: Bool
+    @State private var heights: [CGFloat] = [0.2, 0.4, 0.6, 0.3]
+    let timer = Timer.publish(every: 0.15, on: .main, in: .common).autoconnect()
+    
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(0..<4, id: \.self) { i in
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(Color.white.opacity(0.9))
+                    .frame(width: 3, height: isPlaying ? heights[i] * 16 : 3)
+                    .animation(.easeInOut(duration: 0.15), value: heights[i])
+            }
+        }
+        .frame(height: 16, alignment: .bottom)
+        .onReceive(timer) { _ in
+            if isPlaying {
+                for i in 0..<4 {
+                    heights[i] = CGFloat.random(in: 0.2...1.0)
+                }
+            }
+        }
+    }
+}
+
 struct OnekoView: View {
     @State private var catPos: CGPoint = CGPoint(x: -16, y: -16)
     @State private var direction: Direction = .right
@@ -555,10 +580,21 @@ struct FloatingLyricsView: View {
     @ViewBuilder
     var infoText: some View {
         VStack(alignment: state.isLeft ? .leading : .trailing, spacing: 4) {
-            Text(state.status.title)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(.white)
-                .lineLimit(1)
+            HStack(spacing: 8) {
+                if !state.isLeft {
+                    AudioVisualizerView(isPlaying: !state.status.paused)
+                }
+                
+                Text(state.status.title)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                
+                if state.isLeft {
+                    AudioVisualizerView(isPlaying: !state.status.paused)
+                }
+            }
+            
             if state.status.artist != "" {
                 Text(state.status.artist)
                     .font(.system(size: 13))
