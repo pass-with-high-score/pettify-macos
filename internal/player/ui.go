@@ -2,6 +2,7 @@ package player
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -40,33 +41,64 @@ var (
 			MarginTop(1)
 )
 
+type autoGain struct {
+	streamer beep.Streamer
+	gain     float64
+}
+
+func (g *autoGain) Stream(samples [][2]float64) (n int, ok bool) {
+	n, ok = g.streamer.Stream(samples)
+	for i := 0; i < n; i++ {
+		samples[i][0] *= g.gain
+		samples[i][1] *= g.gain
+	}
+	return n, ok
+}
+
+func (g *autoGain) Err() error {
+	return g.streamer.Err()
+}
+
 func createEQ(base beep.Streamer, sampleRate beep.SampleRate, cfg Config) beep.Streamer {
 	var sections effects.MonoEqualizerSections
 	
-	addBand := func(f0, bf, g float64) {
+	addBand := func(f0, g float64) {
 		if g == 0 {
 			return
 		}
 		sections = append(sections, effects.MonoEqualizerSection{
 			F0: f0,
-			Bf: bf,
+			Bf: f0 / 1.414, // Constant Q factor of ~1.4 for musical, non-resonant bands
 			GB: g / 2.0,
 			G0: 0,
 			G:  g,
 		})
 	}
 	
-	addBand(60, 60, cfg.Band60)
-	addBand(250, 250, cfg.Band250)
-	addBand(1000, 1000, cfg.Band1k)
-	addBand(4000, 4000, cfg.Band4k)
-	addBand(12000, 12000, cfg.Band12k)
+	addBand(60, cfg.Band60)
+	addBand(250, cfg.Band250)
+	addBand(1000, cfg.Band1k)
+	addBand(4000, cfg.Band4k)
+	addBand(12000, cfg.Band12k)
 	
 	if len(sections) == 0 {
 		return base
 	}
 	
-	return effects.NewEqualizer(base, sampleRate, sections)
+	maxBoost := 0.0
+	for _, g := range []float64{cfg.Band60, cfg.Band250, cfg.Band1k, cfg.Band4k, cfg.Band12k} {
+		if g > maxBoost {
+			maxBoost = g
+		}
+	}
+
+	var eqStreamer beep.Streamer = base
+	if maxBoost > 0 {
+		multiplier := math.Pow(10.0, -maxBoost/20.0)
+		eqStreamer = &autoGain{streamer: eqStreamer, gain: multiplier}
+	}
+	
+	return effects.NewEqualizer(eqStreamer, sampleRate, sections)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
