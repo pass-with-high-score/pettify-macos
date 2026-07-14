@@ -159,12 +159,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "[":
 			if m.streamer != nil {
+				speaker.Lock()
 				m.pointA = m.streamer.Position()
+				speaker.Unlock()
 				m.abActive = false
 			}
 		case "]":
 			if m.streamer != nil {
+				speaker.Lock()
 				pos := m.streamer.Position()
+				speaker.Unlock()
 				if pos > m.pointA {
 					m.pointB = pos
 					m.abActive = true
@@ -178,19 +182,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.quitting {
 			return m, nil
 		}
-		if m.abActive && m.streamer != nil {
-			if m.streamer.Position() >= m.pointB {
+		if m.streamer != nil {
+			speaker.Lock()
+			pos := m.streamer.Position()
+			length := m.streamer.Len()
+			speaker.Unlock()
+
+			if m.abActive && pos >= m.pointB {
 				speaker.Lock()
 				m.streamer.Seek(m.pointA)
 				speaker.Unlock()
 			}
-		}
-		if m.streamer != nil && m.streamer.Position() >= m.streamer.Len() {
-			nm, cmd := m.nextSong()
-			if nm.quitting {
+			if pos >= length {
+				nm, cmd := m.nextSong()
+				if nm.quitting {
+					return nm, cmd
+				}
 				return nm, cmd
 			}
-			return nm, cmd
 		}
 		return m, tick()
 
@@ -214,11 +223,14 @@ func (m model) View() string {
 	var percent float64
 	var elapsed, total time.Duration
 	if m.streamer != nil {
+		speaker.Lock()
 		pos := m.streamer.Position()
-		len := m.streamer.Len()
-		percent = float64(pos) / float64(len)
+		length := m.streamer.Len()
+		speaker.Unlock()
+		
+		percent = float64(pos) / float64(length)
 		elapsed = m.format.SampleRate.D(pos).Round(time.Second)
-		total = m.format.SampleRate.D(len).Round(time.Second)
+		total = m.format.SampleRate.D(length).Round(time.Second)
 	}
 
 	status := "PLAYING"
