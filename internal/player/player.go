@@ -153,6 +153,11 @@ func Run(path string, shuffleFlag bool, loopFlag bool) {
 		loading:        true,
 		config:         loadConfig(),
 	}
+	m.searchBar.Prompt = ""
+	
+	m.addInput = textinput.New()
+	m.addInput.Placeholder = "Enter YouTube search (e.g. yt: em cua ngay hom qua) or URL"
+	m.addInput.Prompt = ""
 
 	if _, err := tea.NewProgram(m).Run(); err != nil {
 		fmt.Printf("Error running program: %v", err)

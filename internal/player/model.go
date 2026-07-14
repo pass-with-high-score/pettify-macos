@@ -50,7 +50,9 @@ type model struct {
 	visualizer     *Visualizer
 	progress       progress.Model
 	searchBar      textinput.Model
+	addInput       textinput.Model
 	searching      bool
+	adding         bool
 	quitting       bool
 	loop           bool
 	shuffle        bool
@@ -70,4 +72,9 @@ type loadMsg struct {
 	streamer beep.StreamSeekCloser
 	format   beep.Format
 	err      error
+}
+
+type trackAddedMsg struct {
+	track Track
+	err   error
 }

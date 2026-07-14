@@ -1,8 +1,11 @@
 package player
 
 import (
+	"bytes"
 	"fmt"
 	"math"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -137,7 +140,77 @@ func (m *model) updateStreamer() {
 	m.visualizer.streamer = finalStreamer
 }
 
+func addTrackCmd(query string) tea.Cmd {
+	return func() tea.Msg {
+		if strings.HasPrefix(query, "yt: ") || strings.HasPrefix(query, "yt:") {
+			query = strings.TrimPrefix(query, "yt:")
+			query = strings.TrimSpace(query)
+			query = "ytsearch1:" + query
+		} else if !strings.HasPrefix(query, "http") && !strings.HasPrefix(query, "/") && !strings.HasPrefix(query, "./") && !strings.HasPrefix(query, "~/") {
+			query = "ytsearch1:" + query
+		}
+
+		if strings.HasPrefix(query, "ytsearch1:") || strings.HasPrefix(query, "http") {
+			ytDlpPath := getInternalYtDlpPath()
+			var stdout, stderr bytes.Buffer
+			cmd := exec.Command(ytDlpPath, "--print", "%(title)s|%(id)s|%(url)s|%(uploader)s", query)
+			cmd.Stdout = &stdout
+			cmd.Stderr = &stderr
+			if err := cmd.Run(); err != nil {
+				return trackAddedMsg{err: fmt.Errorf("search failed: %v\n%s", err, stderr.String())}
+			}
+			
+			parts := strings.Split(strings.TrimSpace(stdout.String()), "|")
+			if len(parts) >= 3 {
+				title := parts[0]
+				id := parts[1]
+				url := parts[2]
+				finalURL := ""
+				if strings.HasPrefix(url, "http") && url != "NA" {
+					finalURL = url
+				} else if id != "NA" && id != "" {
+					finalURL = "https://youtu.be/" + id
+				}
+				if finalURL == "" {
+					return trackAddedMsg{err: fmt.Errorf("could not resolve URL")}
+				}
+				artist := ""
+				if len(parts) >= 4 { artist = parts[3] }
+				return trackAddedMsg{track: Track{Path: finalURL, Title: title, Artist: artist}}
+			}
+			return trackAddedMsg{err: fmt.Errorf("no results")}
+		}
+		
+		return trackAddedMsg{track: Track{Path: query, Title: filepath.Base(query)}}
+	}
+}
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.adding {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "esc":
+				m.adding = false
+				m.addInput.Blur()
+				return m, nil
+			case "enter":
+				m.adding = false
+				m.addInput.Blur()
+				val := m.addInput.Value()
+				if strings.TrimSpace(val) == "" {
+					return m, nil
+				}
+				m.addInput.SetValue("")
+				m.err = fmt.Errorf("Searching/Adding track...")
+				return m, addTrackCmd(val)
+			}
+		}
+		var cmd tea.Cmd
+		m.addInput, cmd = m.addInput.Update(msg)
+		return m, cmd
+	}
+
 	if m.searching {
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
@@ -170,6 +243,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.progress.Width = msg.Width - 10
+		return m, nil
+
+	case trackAddedMsg:
+		m.err = nil // clear searching message
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		m.tracks = append(m.tracks, msg.track)
+		m.filteredTracks = append(m.filteredTracks, len(m.tracks)-1)
+		
+		// If nothing is playing (e.g. empty queue or finished), play it immediately
+		if m.streamer == nil && !m.loading {
+			m.currentIndex = len(m.filteredTracks) - 1
+			m.loading = true
+			return m, m.loadSongCmd(m.filteredTracks[m.currentIndex])
+		}
 		return m, nil
 
 	case loadMsg:
@@ -209,6 +299,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			m.quitting = true
 			return m, tea.Quit
+		case "a":
+			m.adding = true
+			m.addInput.Focus()
+			return m, nil
 		case "/":
 			m.searching = true
 			m.searchBar.Focus()
@@ -456,6 +550,8 @@ func (m model) View() string {
 
 	if m.searching {
 		s += "\n Search: " + m.searchBar.View() + "\n"
+	} else if m.adding {
+		s += "\n Add Track: " + m.addInput.View() + "\n"
 	} else {
 		s += "\n" + dimStyle.Render("Playlist:") + "\n"
 		start := m.currentIndex - 2
@@ -477,7 +573,7 @@ func (m model) View() string {
 		}
 	}
 
-	s += helpStyle.Render("Space: Pause • N/P: Next/Prev • Left/Right: Seek • Up/Down: Vol • 1-0: EQ • R: Reset • /: Search • Q: Quit") + "\n"
+	s += helpStyle.Render("Space: Pause • N/P: Next/Prev • Left/Right: Seek • Up/Down: Vol • 1-0: EQ • R: Reset • /: Search • A: Add • Q: Quit") + "\n"
 
 	return s
 }
