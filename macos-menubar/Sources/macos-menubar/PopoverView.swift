@@ -274,6 +274,18 @@ struct PopoverView: View {
         .frame(width: 320)
         .background(VisualEffectView().edgesIgnoringSafeArea(.all))
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: state.tracks.count)
+        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+            for provider in providers {
+                _ = provider.loadObject(ofClass: URL.self) { url, error in
+                    if let url = url {
+                        DispatchQueue.main.async {
+                            state.addLocalTrack(url: url)
+                        }
+                    }
+                }
+            }
+            return true
+        }
     }
     
     private func submitSearch() {

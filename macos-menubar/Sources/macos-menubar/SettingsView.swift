@@ -17,6 +17,8 @@ struct SettingsView: View {
     @State private var cacheSize: String = "Calculating..."
     @State private var selectedTab: String = "general"
     
+    @ObservedObject var state: AppState
+    
     var body: some View {
         HStack(spacing: 0) {
             // Sidebar
@@ -172,6 +174,35 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Default Startup Volume: \(Int(defaultVolume * 100))%").bold()
                         Slider(value: $defaultVolume, in: 0.0...1.0, step: 0.05)
+                    }
+                    
+                    Divider()
+                    
+                    Text("Audio Engine (AVAudioEngine)").bold()
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Playback Speed: \(String(format: "%.1fx", state.audioPlayer.rate))").bold()
+                        Slider(value: $state.audioPlayer.rate, in: 0.5...2.0, step: 0.1)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Pitch Shift: \(Int(state.audioPlayer.pitch)) cents").bold()
+                        Slider(value: $state.audioPlayer.pitch, in: -1200...1200, step: 100)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Output Device").bold()
+                        let devices = state.audioPlayer.getOutputDevices()
+                        Picker("", selection: Binding(
+                            get: { return 0 },
+                            set: { id in state.audioPlayer.setOutputDevice(id: UInt32(id)) }
+                        )) {
+                            Text("System Default").tag(0)
+                            ForEach(devices, id: \.id) { device in
+                                Text(device.name).tag(Int(device.id))
+                            }
+                        }
+                        .pickerStyle(.menu)
                     }
                 }
                 .padding(10)

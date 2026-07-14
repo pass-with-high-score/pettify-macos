@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreAudio
 import Foundation
 
 @MainActor
@@ -11,6 +12,14 @@ final class AudioPlayerService: NSObject, ObservableObject {
     @Published var duration: Double = 0.0
     @Published var volume: Float = 1.0
 
+    // Audio Engine Properties
+    @Published var pitch: Float = 0.0 { // cents (100 cents = 1 semitone)
+        didSet { timePitch.pitch = pitch }
+    }
+    @Published var rate: Float = 1.0 { // 1.0 = normal
+        didSet { timePitch.rate = rate }
+    }
+    
     // MARK: Callback
 
     /// Called on the main actor when the current track finishes playing naturally.
@@ -18,27 +27,73 @@ final class AudioPlayerService: NSObject, ObservableObject {
 
     // MARK: Private
 
-    private var audioPlayer: AVAudioPlayer?
+    private let engine = AVAudioEngine()
+    private let playerNode = AVAudioPlayerNode()
+    private let timePitch = AVAudioUnitTimePitch()
+    private let eq = AVAudioUnitEQ(numberOfBands: 10)
+    
     private var progressTimer: Timer?
+    private var currentAudioFile: AVAudioFile?
+    private var seekTimeOffset: Double = 0.0
+    private var isManualStop: Bool = false
+
+    override init() {
+        super.init()
+        setupEngine()
+    }
+    
+    private func setupEngine() {
+        engine.attach(playerNode)
+        engine.attach(timePitch)
+        engine.attach(eq)
+        
+        let format = engine.outputNode.outputFormat(forBus: 0)
+        engine.connect(playerNode, to: timePitch, format: format)
+        engine.connect(timePitch, to: eq, format: format)
+        engine.connect(eq, to: engine.mainMixerNode, format: format)
+        
+        // Setup default EQ bands (flat)
+        let frequencies: [Float] = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
+        for i in 0..<eq.bands.count {
+            eq.bands[i].filterType = .parametric
+            eq.bands[i].frequency = frequencies[i]
+            eq.bands[i].bandwidth = 1.0
+            eq.bands[i].gain = 0.0
+            eq.bands[i].bypass = false
+        }
+        
+        engine.prepare()
+        try? engine.start()
+    }
 
     // MARK: - Playback Controls
 
-    /// Loads and plays an audio file from the given local URL.
     func play(fileURL: URL) {
         stopProgressTimer()
-
+        isManualStop = true
+        playerNode.stop()
+        
         do {
-            let player = try AVAudioPlayer(contentsOf: fileURL)
-            player.delegate = self
-            player.volume = volume
-            player.prepareToPlay()
-            player.play()
-
-            audioPlayer = player
-            duration = player.duration
+            let file = try AVAudioFile(forReading: fileURL)
+            currentAudioFile = file
+            duration = Double(file.length) / file.processingFormat.sampleRate
             currentTime = 0.0
+            seekTimeOffset = 0.0
+            isManualStop = false
+            
+            if !engine.isRunning {
+                try engine.start()
+            }
+            
+            playerNode.scheduleFile(file, at: nil) { [weak self] in
+                Task { @MainActor in
+                    self?.handlePlaybackFinished()
+                }
+            }
+            
+            engine.mainMixerNode.outputVolume = volume
+            playerNode.play()
             isPlaying = true
-
             startProgressTimer()
         } catch {
             isPlaying = false
@@ -48,22 +103,20 @@ final class AudioPlayerService: NSObject, ObservableObject {
         }
     }
 
-    /// Pauses the currently playing audio.
     func pause() {
-        audioPlayer?.pause()
+        playerNode.pause()
         isPlaying = false
+        updateCurrentTime()
         stopProgressTimer()
     }
 
-    /// Resumes playback from the current position.
     func resume() {
-        guard let player = audioPlayer else { return }
-        player.play()
+        if !engine.isRunning { try? engine.start() }
+        playerNode.play()
         isPlaying = true
         startProgressTimer()
     }
 
-    /// Toggles between play and pause states.
     func togglePlayPause() {
         if isPlaying {
             pause()
@@ -72,29 +125,63 @@ final class AudioPlayerService: NSObject, ObservableObject {
         }
     }
 
-    /// Seeks to the specified time in seconds.
     func seek(to seconds: Double) {
-        guard let player = audioPlayer else { return }
-        let clamped = max(0, min(seconds, player.duration))
-        player.currentTime = clamped
+        guard let file = currentAudioFile else { return }
+        let clamped = max(0, min(seconds, duration))
+        
+        isManualStop = true
+        playerNode.stop()
+        
+        seekTimeOffset = clamped
         currentTime = clamped
+        isManualStop = false
+        
+        let sampleRate = file.processingFormat.sampleRate
+        let newSampleTime = AVAudioFramePosition(clamped * sampleRate)
+        let framesToPlay = AVAudioFrameCount(file.length - newSampleTime)
+        
+        if framesToPlay > 0 {
+            playerNode.scheduleSegment(file, startingFrame: newSampleTime, frameCount: framesToPlay, at: nil) { [weak self] in
+                Task { @MainActor in
+                    self?.handlePlaybackFinished()
+                }
+            }
+        } else {
+            handlePlaybackFinished()
+        }
+        
+        if isPlaying {
+            playerNode.play()
+        }
     }
 
-    /// Sets the playback volume (0.0 to 1.0).
     func setVolume(_ newVolume: Float) {
         let clamped = max(0.0, min(1.0, newVolume))
         volume = clamped
-        audioPlayer?.volume = clamped
+        engine.mainMixerNode.outputVolume = clamped
+    }
+    
+    func setEQBand(index: Int, gain: Float) {
+        guard index >= 0 && index < eq.bands.count else { return }
+        eq.bands[index].gain = max(-24.0, min(24.0, gain))
     }
 
-    /// Stops playback and releases resources.
     func stop() {
         stopProgressTimer()
-        audioPlayer?.stop()
-        audioPlayer = nil
+        isManualStop = true
+        playerNode.stop()
         isPlaying = false
         currentTime = 0.0
         duration = 0.0
+    }
+    
+    private func handlePlaybackFinished() {
+        Task { @MainActor in
+            guard !self.isManualStop else { return }
+            self.isPlaying = false
+            self.stopProgressTimer()
+            self.onTrackFinished?()
+        }
     }
 
     // MARK: - Progress Timer
@@ -103,8 +190,7 @@ final class AudioPlayerService: NSObject, ObservableObject {
         stopProgressTimer()
         progressTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                guard let self, let player = self.audioPlayer else { return }
-                self.currentTime = player.currentTime
+                self?.updateCurrentTime()
             }
         }
     }
@@ -113,27 +199,78 @@ final class AudioPlayerService: NSObject, ObservableObject {
         progressTimer?.invalidate()
         progressTimer = nil
     }
-}
-
-// MARK: - AVAudioPlayerDelegate
-
-extension AudioPlayerService: AVAudioPlayerDelegate {
-
-    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        Task { @MainActor in
-            self.isPlaying = false
-            self.stopProgressTimer()
-            self.onTrackFinished?()
+    
+    private func updateCurrentTime() {
+        guard isPlaying, let nodeTime = playerNode.lastRenderTime, let playerTime = playerNode.playerTime(forNodeTime: nodeTime) else { return }
+        let playedTime = Double(playerTime.sampleTime) / playerTime.sampleRate
+        currentTime = seekTimeOffset + playedTime
+        
+        // Cap at duration
+        if currentTime >= duration && duration > 0 {
+            currentTime = duration
         }
     }
 
-    nonisolated func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: (any Error)?) {
-        Task { @MainActor in
-            self.isPlaying = false
-            self.stopProgressTimer()
-            if let error {
-                print("[AudioPlayerService] Decode error: \(error.localizedDescription)")
+    // MARK: - Output Device Selection
+    
+    struct AudioDevice: Hashable {
+        let id: AudioDeviceID
+        let name: String
+    }
+    
+    func getOutputDevices() -> [AudioDevice] {
+        var propsize: UInt32 = 0
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        
+        var result = AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &propsize)
+        guard result == 0 else { return [] }
+        
+        let deviceCount = Int(propsize / UInt32(MemoryLayout<AudioDeviceID>.size))
+        var deviceIDs = [AudioDeviceID](repeating: 0, count: deviceCount)
+        
+        result = AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &propsize, &deviceIDs)
+        guard result == 0 else { return [] }
+        
+        var devices: [AudioDevice] = []
+        
+        for id in deviceIDs {
+            var streamAddress = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyStreams,
+                mScope: kAudioDevicePropertyScopeOutput,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            var streamSize: UInt32 = 0
+            AudioObjectGetPropertyDataSize(id, &streamAddress, 0, nil, &streamSize)
+            if streamSize > 0 {
+                var nameAddress = AudioObjectPropertyAddress(
+                    mSelector: kAudioDevicePropertyDeviceNameCFString,
+                    mScope: kAudioObjectPropertyScopeGlobal,
+                    mElement: kAudioObjectPropertyElementMain
+                )
+                var nameCF: CFString = "" as CFString
+                var nameSize = UInt32(MemoryLayout<CFString>.size)
+                AudioObjectGetPropertyData(id, &nameAddress, 0, nil, &nameSize, &nameCF)
+                let name = nameCF as String
+                devices.append(AudioDevice(id: id, name: name))
             }
         }
+        return devices
+    }
+    
+    func setOutputDevice(id: AudioDeviceID) {
+        guard let outputUnit = engine.outputNode.audioUnit else { return }
+        var deviceID = id
+        AudioUnitSetProperty(
+            outputUnit,
+            kAudioOutputUnitProperty_CurrentDevice,
+            kAudioUnitScope_Global,
+            0,
+            &deviceID,
+            UInt32(MemoryLayout<AudioDeviceID>.size)
+        )
     }
 }

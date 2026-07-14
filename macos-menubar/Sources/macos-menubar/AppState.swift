@@ -27,7 +27,7 @@ class AppState: ObservableObject {
     @Published var repeatMode: RepeatMode = .off
 
     let ytdlp = YtDlpService()
-    let audioPlayer = AudioPlayerService()
+    @Published var audioPlayer = AudioPlayerService()
     var tracks: [TrackInfo] = []
     var currentTrackIndex: Int = -1
 
@@ -159,7 +159,7 @@ class AppState: ObservableObject {
     }
 
     func addTrack(query: String) {
-        status.searchStatus = "Searching YouTube..."
+        status.searchStatus = "Searching..."
         Task {
             do {
                 let trackInfo = try await ytdlp.search(query: query)
@@ -174,10 +174,19 @@ class AppState: ObservableObject {
                 }
             } catch {
                 status.searchStatus = "Error: \(error.localizedDescription)"
-                // Clear error after 3 seconds
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
                 status.searchStatus = ""
             }
+        }
+    }
+    
+    func addLocalTrack(url: URL) {
+        let filename = url.deletingPathExtension().lastPathComponent
+        let trackInfo = TrackInfo(title: filename, videoId: "", url: url.absoluteString, artist: "Local File")
+        tracks.append(trackInfo)
+        if tracks.count == 1 {
+            currentTrackIndex = 0
+            Task { await playCurrentTrack() }
         }
     }
 
@@ -205,12 +214,19 @@ class AppState: ObservableObject {
         }
 
         do {
-            // Auto-cleanup cache before downloading
-            performCacheCleanup()
-            
-            // Download audio if not already cached
-            let audioQuality = UserDefaults.standard.string(forKey: "audioQuality") ?? "bestaudio"
-            let localPath = try await ytdlp.downloadAudio(from: track.url, quality: audioQuality)
+            let localPath: URL
+            if track.url.hasPrefix("file://") {
+                // Local file playback
+                localPath = URL(string: track.url)!
+                status.searchStatus = ""
+            } else {
+                // Auto-cleanup cache before downloading
+                performCacheCleanup()
+                
+                // Download audio if not already cached
+                let audioQuality = UserDefaults.standard.string(forKey: "audioQuality") ?? "bestaudio"
+                localPath = try await ytdlp.downloadAudio(from: track.url, quality: audioQuality)
+            }
             audioPlayer.play(fileURL: localPath)
             updateStatus()
         } catch {

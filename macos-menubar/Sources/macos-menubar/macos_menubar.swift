@@ -6,7 +6,7 @@ import MediaPlayer
 struct MenuBarApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     var body: some Scene {
-        Settings { SettingsView() }
+        Settings { SettingsView(state: appDelegate.state) }
     }
 }
 
@@ -17,6 +17,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let state = AppState()
     var floatingWindow: FloatingLyricsWindow!
     var settingsWindow: NSWindow?
+    var wasPlayingBeforeSleep = false
     
     func applicationWillFinishLaunching(_ notification: Notification) {
         let showDockIcon = UserDefaults.standard.bool(forKey: "showDockIcon")
@@ -61,13 +62,39 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         
-        NotificationCenter.default.addObserver(forName: NSNotification.Name("OpenSettings"), object: nil, queue: .main) { [weak self] _ in
-            self?.openSettings()
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("OpenSettings"), object: nil, queue: nil) { [weak self] _ in
+            Task { @MainActor in
+                self?.openSettings()
+            }
         }
         
         NotificationCenter.default.addObserver(forName: NSNotification.Name("QuitApp"), object: nil, queue: .main) { _ in
             NSApplication.shared.terminate(nil)
             exit(0)
+        }
+        
+        // Smart Auto-Pause
+        let workspaceNotificationCenter = NSWorkspace.shared.notificationCenter
+        workspaceNotificationCenter.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: nil) { [weak self] _ in
+            Task { @MainActor in
+                guard let self = self else { return }
+                if !self.state.status.paused {
+                    self.wasPlayingBeforeSleep = true
+                    self.state.post("playpause")
+                } else {
+                    self.wasPlayingBeforeSleep = false
+                }
+            }
+        }
+        
+        workspaceNotificationCenter.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: nil) { [weak self] _ in
+            Task { @MainActor in
+                guard let self = self else { return }
+                if self.wasPlayingBeforeSleep {
+                    self.state.post("playpause")
+                    self.wasPlayingBeforeSleep = false
+                }
+            }
         }
     }
     
@@ -83,7 +110,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc func openSettings() {
         if settingsWindow == nil {
-            let settingsView = SettingsView()
+            let settingsView = SettingsView(state: state)
             let window = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 650, height: 450),
                 styleMask: [.titled, .closable, .miniaturizable, .resizable],
