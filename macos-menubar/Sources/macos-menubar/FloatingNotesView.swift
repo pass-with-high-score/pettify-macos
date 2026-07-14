@@ -16,7 +16,7 @@ struct FloatingNotesView: View {
     var isPlaying: Bool
     var dominantColor: Color
     @State private var notes: [FloatingNote] = []
-    let timer = Timer.publish(every: 0.6, on: .main, in: .common).autoconnect()
+    @State private var floatingNotesTimer = Timer.publish(every: 0.6, on: .main, in: .common).autoconnect()
     
     let symbols = ["music.note", "music.quarternote.3", "sparkles", "heart.fill", "star.fill"]
     
@@ -35,7 +35,7 @@ struct FloatingNotesView: View {
                         .animation(.easeOut(duration: 3.0), value: note.opacity)
                 }
             }
-            .onReceive(timer) { _ in
+            .onReceive(floatingNotesTimer) { _ in
                 if isPlaying {
                     spawnNote(in: geo.size)
                 }
