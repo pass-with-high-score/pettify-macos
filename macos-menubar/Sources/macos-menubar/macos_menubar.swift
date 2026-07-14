@@ -314,7 +314,6 @@ struct FloatingNotesView: View {
                         .scaleEffect(note.scale)
                         .position(x: note.x, y: note.y)
                         .opacity(note.opacity)
-                        .shadow(color: note.color.opacity(0.5), radius: 2)
                         .animation(.easeOut(duration: 3.0), value: note.y)
                         .animation(.easeOut(duration: 3.0), value: note.opacity)
                 }
@@ -712,7 +711,7 @@ struct FloatingLyricsView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
             )
-            .shadow(color: .black.opacity(0.5), radius: 5, x: 0, y: 2)
+            .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 4)
             .overlay(OnekoView())
         }
     }
