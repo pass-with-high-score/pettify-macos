@@ -137,6 +137,7 @@ func Run(path string, shuffleFlag bool, loopFlag bool) {
 		loop:           loopFlag,
 		shuffle:        shuffleFlag,
 		loading:        true,
+		config:         loadConfig(),
 	}
 
 	if _, err := tea.NewProgram(m).Run(); err != nil {

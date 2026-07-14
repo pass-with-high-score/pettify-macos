@@ -91,7 +91,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.abActive = false
 		
 		m.ctrl = &beep.Ctrl{Streamer: m.streamer, Paused: false}
-		m.volume = &effects.Volume{Streamer: m.ctrl, Base: 2, Volume: 0, Silent: false}
+		m.volume = &effects.Volume{Streamer: m.ctrl, Base: 2, Volume: m.config.Volume, Silent: false}
 		m.visualizer = &Visualizer{streamer: m.volume}
 
 		if !m.initialized {
@@ -130,13 +130,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.volume != nil {
 				speaker.Lock()
 				m.volume.Volume += 0.1
+				m.config.Volume = m.volume.Volume
 				speaker.Unlock()
+				go saveConfig(m.config)
 			}
 		case "down":
 			if m.volume != nil {
 				speaker.Lock()
 				m.volume.Volume -= 0.1
+				m.config.Volume = m.volume.Volume
 				speaker.Unlock()
+				go saveConfig(m.config)
 			}
 		case "j", "left":
 			if m.streamer != nil {

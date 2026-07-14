@@ -61,6 +61,7 @@ type model struct {
 	pointB         int
 	abActive       bool
 	loading        bool
+	config         Config
 }
 
 type tickMsg time.Time
