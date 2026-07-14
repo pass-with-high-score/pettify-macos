@@ -298,11 +298,11 @@ struct AudioVisualizerView: View {
             ForEach(0..<4, id: \.self) { i in
                 RoundedRectangle(cornerRadius: 1.5)
                     .fill(Color.white.opacity(0.9))
-                    .frame(width: 3, height: isPlaying ? heights[i] * 16 : 3)
+                    .frame(width: 3, height: isPlaying ? heights[i] * 12 : 3)
                     .animation(.easeInOut(duration: 0.15), value: heights[i])
             }
         }
-        .frame(height: 16, alignment: .bottom)
+        .frame(height: 12, alignment: .bottom)
         .onReceive(timer) { _ in
             if isPlaying {
                 for i in 0..<4 {
@@ -580,20 +580,10 @@ struct FloatingLyricsView: View {
     @ViewBuilder
     var infoText: some View {
         VStack(alignment: state.isLeft ? .leading : .trailing, spacing: 4) {
-            HStack(spacing: 8) {
-                if !state.isLeft {
-                    AudioVisualizerView(isPlaying: !state.status.paused)
-                }
-                
-                Text(state.status.title)
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                
-                if state.isLeft {
-                    AudioVisualizerView(isPlaying: !state.status.paused)
-                }
-            }
+            Text(state.status.title)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(.white)
+                .lineLimit(1)
             
             if state.status.artist != "" {
                 Text(state.status.artist)
@@ -603,6 +593,11 @@ struct FloatingLyricsView: View {
             }
             
             HStack(spacing: 6) {
+                if !state.isLeft {
+                    AudioVisualizerView(isPlaying: !state.status.paused)
+                        .padding(.trailing, 2)
+                }
+                
                 Text(state.formatTime(state.status.position))
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundColor(.white.opacity(0.8))
@@ -614,6 +609,11 @@ struct FloatingLyricsView: View {
                 Text(state.formatTime(state.status.duration))
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundColor(.white.opacity(0.8))
+                
+                if state.isLeft {
+                    AudioVisualizerView(isPlaying: !state.status.paused)
+                        .padding(.leading, 2)
+                }
             }
             .padding(.top, 2)
         }
