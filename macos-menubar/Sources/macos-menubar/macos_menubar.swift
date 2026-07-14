@@ -298,7 +298,7 @@ struct OnekoView: View {
     
     enum Direction { case right, down, left, up }
     
-    let timer = Timer.publish(every: 0.08, on: .main, in: .common).autoconnect()
+    let timer = Timer.publish(every: 0.15, on: .main, in: .common).autoconnect()
     
     var body: some View {
         GeometryReader { geo in
@@ -347,7 +347,7 @@ struct OnekoView: View {
             return
         }
         
-        let speed: CGFloat = 8
+        let speed: CGFloat = 4
         
         switch direction {
         case .right:
@@ -526,7 +526,11 @@ struct FloatingLyricsView: View {
                         if let image = phase.image {
                             image.resizable().aspectRatio(contentMode: .fill)
                         } else {
-                            Color.gray.opacity(0.3)
+                            ZStack {
+                                Color.white.opacity(0.1)
+                                Image(systemName: "music.note")
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
                         }
                     }.frame(width: 40, height: 40).cornerRadius(6)
                 } else {
