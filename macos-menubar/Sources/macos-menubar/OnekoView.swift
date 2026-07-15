@@ -13,6 +13,7 @@ struct OnekoView: View {
     @State private var surpriseTick = 0
     @State private var showHeart = false
     @State private var normalTickCounter = 0
+    @State private var wallClawTick = 0
     
     enum Direction { case right, down, left, up }
     
@@ -80,6 +81,27 @@ struct OnekoView: View {
             return
         }
         
+        if wallClawTick > 0 {
+            wallClawTick -= 1
+            let isClaw1 = (wallClawTick / 4) % 2 == 0
+            switch direction {
+            case .right: frameName = isClaw1 ? "rightclaw1" : "rightclaw2"
+            case .left: frameName = isClaw1 ? "leftclaw1" : "leftclaw2"
+            case .up: frameName = isClaw1 ? "upclaw1" : "upclaw2"
+            case .down: frameName = isClaw1 ? "downclaw1" : "downclaw2"
+            }
+            
+            if wallClawTick == 0 {
+                switch direction {
+                case .right: direction = .down; maybeSleep()
+                case .down: direction = .left; maybeSleep()
+                case .left: direction = .up; maybeSleep()
+                case .up: direction = .right; maybeSleep()
+                }
+            }
+            return
+        }
+        
         if state.status.paused {
             if sleepTick < 10 { sleepTick = 100 }
         } else if sleepTick > 0 {
@@ -115,45 +137,41 @@ struct OnekoView: View {
         case .right:
             frameName = (frameName == "right1") ? "right2" : "right1"
             catPos.x += speed
-            if catPos.x >= size.width + 16 {
-                catPos.x = size.width + 16
-                direction = .down
-                maybeSleep()
-            } else if catPos.x <= -16 {
-                catPos.x = -16
+            if catPos.x >= size.width - 16 {
+                catPos.x = size.width - 16
+                wallClawTick = 40
+            } else if catPos.x <= 16 {
+                catPos.x = 16
                 direction = .up
             }
         case .down:
             frameName = (frameName == "down1") ? "down2" : "down1"
             catPos.y += speed
-            if catPos.y >= size.height + 16 {
-                catPos.y = size.height + 16
-                direction = .left
-                maybeSleep()
-            } else if catPos.y <= -16 {
-                catPos.y = -16
+            if catPos.y >= size.height - 16 {
+                catPos.y = size.height - 16
+                wallClawTick = 40
+            } else if catPos.y <= 16 {
+                catPos.y = 16
                 direction = .right
             }
         case .left:
             frameName = (frameName == "left1") ? "left2" : "left1"
             catPos.x -= speed
-            if catPos.x <= -16 {
-                catPos.x = -16
-                direction = .up
-                maybeSleep()
-            } else if catPos.x >= size.width + 16 {
-                catPos.x = size.width + 16
+            if catPos.x <= 16 {
+                catPos.x = 16
+                wallClawTick = 40
+            } else if catPos.x >= size.width - 16 {
+                catPos.x = size.width - 16
                 direction = .down
             }
         case .up:
             frameName = (frameName == "up1") ? "up2" : "up1"
             catPos.y -= speed
-            if catPos.y <= -16 {
-                catPos.y = -16
-                direction = .right
-                maybeSleep()
-            } else if catPos.y >= size.height + 16 {
-                catPos.y = size.height + 16
+            if catPos.y <= 16 {
+                catPos.y = 16
+                wallClawTick = 40
+            } else if catPos.y >= size.height - 16 {
+                catPos.y = size.height - 16
                 direction = .left
             }
         }
