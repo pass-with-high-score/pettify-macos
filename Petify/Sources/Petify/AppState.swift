@@ -705,6 +705,10 @@ class AppState: ObservableObject {
 
     // MARK: - Now Playing & Remote Controls
 
+    nonisolated private static func createArtwork(from image: NSImage) -> MPMediaItemArtwork {
+        return MPMediaItemArtwork(boundsSize: image.size, requestHandler: { _ in image })
+    }
+
     func updateNowPlaying() {
         var nowPlayingInfo = [String: Any]()
         nowPlayingInfo[MPMediaItemPropertyTitle] = status.title
@@ -714,7 +718,7 @@ class AppState: ObservableObject {
         nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = status.paused ? 0.0 : 1.0
         
         if let artwork = currentArtwork {
-            nowPlayingInfo[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: artwork.size, requestHandler: { _ in artwork })
+            nowPlayingInfo[MPMediaItemPropertyArtwork] = Self.createArtwork(from: artwork)
         }
         
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo

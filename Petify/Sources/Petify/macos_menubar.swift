@@ -60,6 +60,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             floatingWindow.snapToCorner()
         }
         
+        // Removed test crash block
+        
         // Setup neko screen-edge window
         setupNekoScreenEdge()
         
