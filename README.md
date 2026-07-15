@@ -31,8 +31,8 @@ brew install pass-with-high-score/tap/petify
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/pass-with-high-score/audio-cli.git
-   cd audio-cli
+   git clone https://github.com/pass-with-high-score/pettify-macos.git
+   cd pettify-macos
    ```
 
 2. Open the Swift package and build:
