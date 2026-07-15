@@ -39,7 +39,7 @@ final class AudioPlayerService: NSObject, ObservableObject {
     private var progressTimer: Timer?
     private var currentAudioFile: AVAudioFile?
     private var seekTimeOffset: Double = 0.0
-    private var isManualStop: Bool = false
+    private var playbackToken = UUID()
 
     override init() {
         super.init()
@@ -74,7 +74,7 @@ final class AudioPlayerService: NSObject, ObservableObject {
 
     func play(fileURL: URL) {
         stopProgressTimer()
-        isManualStop = true
+        playbackToken = UUID() // invalidate previous
         playerNode.stop()
         
         do {
@@ -83,16 +83,19 @@ final class AudioPlayerService: NSObject, ObservableObject {
             duration = Double(file.length) / file.processingFormat.sampleRate
             currentTime = 0.0
             seekTimeOffset = 0.0
-            isManualStop = false
             hasLoadedFile = true
             
             if !engine.isRunning {
                 try engine.start()
             }
             
+            
+            let token = UUID()
+            playbackToken = token
+            
             playerNode.scheduleFile(file, at: nil) { [weak self] in
                 Task { @MainActor in
-                    self?.handlePlaybackFinished()
+                    self?.handlePlaybackFinished(token: token)
                 }
             }
             
@@ -135,25 +138,27 @@ final class AudioPlayerService: NSObject, ObservableObject {
         guard let file = currentAudioFile else { return }
         let clamped = max(0, min(seconds, duration))
         
-        isManualStop = true
+        playbackToken = UUID() // invalidate current playback
         playerNode.stop()
         
         seekTimeOffset = clamped
         currentTime = clamped
-        isManualStop = false
         
         let sampleRate = file.processingFormat.sampleRate
         let newSampleTime = AVAudioFramePosition(clamped * sampleRate)
         let framesToPlay = AVAudioFrameCount(file.length - newSampleTime)
         
         if framesToPlay > 0 {
+            let token = UUID()
+            playbackToken = token
+            
             playerNode.scheduleSegment(file, startingFrame: newSampleTime, frameCount: framesToPlay, at: nil) { [weak self] in
                 Task { @MainActor in
-                    self?.handlePlaybackFinished()
+                    self?.handlePlaybackFinished(token: token)
                 }
             }
         } else {
-            handlePlaybackFinished()
+            handlePlaybackFinished(token: playbackToken)
         }
         
         if isPlaying {
@@ -174,7 +179,7 @@ final class AudioPlayerService: NSObject, ObservableObject {
 
     func stop() {
         stopProgressTimer()
-        isManualStop = true
+        playbackToken = UUID()
         playerNode.stop()
         isPlaying = false
         currentTime = 0.0
@@ -182,9 +187,9 @@ final class AudioPlayerService: NSObject, ObservableObject {
         hasLoadedFile = false
     }
     
-    private func handlePlaybackFinished() {
+    private func handlePlaybackFinished(token: UUID) {
         Task { @MainActor in
-            guard !self.isManualStop else { return }
+            guard token == self.playbackToken else { return }
             self.isPlaying = false
             self.stopProgressTimer()
             self.onTrackFinished?()
@@ -272,6 +277,24 @@ final class AudioPlayerService: NSObject, ObservableObject {
         guard let outputUnit = engine.outputNode.audioUnit else { return }
         var deviceID = id
         
+        var actualDeviceID = id
+        if id == 0 {
+            var propsize = UInt32(MemoryLayout<AudioDeviceID>.size)
+            var address = AudioObjectPropertyAddress(
+                mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            AudioObjectGetPropertyData(
+                AudioObjectID(kAudioObjectSystemObject),
+                &address,
+                0,
+                nil,
+                &propsize,
+                &actualDeviceID
+            )
+        }
+        
         // Update the published state
         Task { @MainActor in
             self.currentOutputDeviceID = id
@@ -287,7 +310,7 @@ final class AudioPlayerService: NSObject, ObservableObject {
             kAudioOutputUnitProperty_CurrentDevice,
             kAudioUnitScope_Global,
             0,
-            &deviceID,
+            &actualDeviceID,
             UInt32(MemoryLayout<AudioDeviceID>.size)
         )
         
