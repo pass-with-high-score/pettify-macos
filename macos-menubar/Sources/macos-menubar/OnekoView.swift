@@ -8,7 +8,8 @@ struct OnekoView: View {
     @State private var direction: Direction = .right
     @State private var sleepTick = 50
     @State private var tickCounter = 0
-    @State private var frameNo = 25
+    @State private var frameName = "wash2"
+    @AppStorage("nekoSkin") private var nekoSkin = "neko"
     @State private var surpriseTick = 0
     @State private var showHeart = false
     @State private var normalTickCounter = 0
@@ -20,7 +21,7 @@ struct OnekoView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                if let url = Bundle.module.url(forResource: "\(frameNo)", withExtension: "gif"),
+                if let url = Bundle.module.url(forResource: frameName, withExtension: "png", subdirectory: "Skins/\(nekoSkin)"),
                    let nsImage = NSImage(contentsOf: url) {
                     Image(nsImage: nsImage)
                         .resizable()
@@ -42,6 +43,14 @@ struct OnekoView: View {
                             surpriseTick = 5
                         }
                         .position(catPos)
+                } else if let fallbackUrl = Bundle.module.url(forResource: frameName, withExtension: "png", subdirectory: "Skins/neko"),
+                          let fallbackImage = NSImage(contentsOf: fallbackUrl) {
+                    // Fallback to default neko skin if current skin doesn't have the frame or fails to load
+                    Image(nsImage: fallbackImage)
+                        .resizable()
+                        .frame(width: 32, height: 32)
+                        .shadow(color: .black.opacity(0.3), radius: 2)
+                        .position(catPos)
                 }
             }
             .onReceive(timer) { _ in
@@ -62,12 +71,12 @@ struct OnekoView: View {
         
         if surpriseTick > 0 {
             surpriseTick -= 1
-            frameNo = 32
+            frameName = "awake"
             return
         }
         
         if showHeart {
-            frameNo = 32 // stop and stare
+            frameName = "awake" // stop and stare
             return
         }
         
@@ -82,13 +91,13 @@ struct OnekoView: View {
             sleepTick -= 1
             let slowTick = sleepTick / 4
             if sleepTick > 80 {
-                frameNo = (slowTick % 2 == 0) ? 31 : 25 // lick
+                frameName = "wash2" // lick
             } else if sleepTick > 40 {
-                frameNo = (slowTick % 2 == 0) ? 27 : 28 // scratch
+                frameName = (slowTick % 2 == 0) ? "scratch1" : "scratch2" // scratch
             } else if sleepTick > 30 {
-                frameNo = 26 // yawn
+                frameName = "yawn2" // yawn
             } else {
-                frameNo = ((sleepTick / 8) % 2 == 0) ? 29 : 30 // sleep slowly
+                frameName = ((sleepTick / 8) % 2 == 0) ? "sleep1" : "sleep2" // sleep slowly
             }
             
             if sleepTick == 0 {
@@ -104,7 +113,7 @@ struct OnekoView: View {
         
         switch direction {
         case .right:
-            frameNo = (frameNo == 5) ? 6 : 5 // Right frames
+            frameName = (frameName == "right1") ? "right2" : "right1"
             catPos.x += speed
             if catPos.x >= size.width + 16 {
                 catPos.x = size.width + 16
@@ -115,7 +124,7 @@ struct OnekoView: View {
                 direction = .up
             }
         case .down:
-            frameNo = (frameNo == 9) ? 10 : 9 // Down frames
+            frameName = (frameName == "down1") ? "down2" : "down1"
             catPos.y += speed
             if catPos.y >= size.height + 16 {
                 catPos.y = size.height + 16
@@ -126,7 +135,7 @@ struct OnekoView: View {
                 direction = .right
             }
         case .left:
-            frameNo = (frameNo == 13) ? 14 : 13 // Left frames
+            frameName = (frameName == "left1") ? "left2" : "left1"
             catPos.x -= speed
             if catPos.x <= -16 {
                 catPos.x = -16
@@ -137,7 +146,7 @@ struct OnekoView: View {
                 direction = .down
             }
         case .up:
-            frameNo = (frameNo == 1) ? 2 : 1 // Up frames
+            frameName = (frameName == "up1") ? "up2" : "up1"
             catPos.y -= speed
             if catPos.y <= -16 {
                 catPos.y = -16

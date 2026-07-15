@@ -9,6 +9,8 @@ struct SettingsView: View {
     @AppStorage("floatingOpacity") private var floatingOpacity = 1.0
     @AppStorage("floatingFontSize") private var floatingFontSize = 36.0
     
+    @AppStorage("nekoSkin") private var nekoSkin = "neko"
+    
     @AppStorage("audioQuality") private var audioQuality = "bestaudio"
     @AppStorage("defaultVolume") private var defaultVolume = 1.0
     
@@ -147,6 +149,19 @@ struct SettingsView: View {
                             Text("Extra Large").tag(64.0)
                         }
                         .pickerStyle(.segmented)
+                    }
+                    
+                    Divider()
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Desktop Pet Skin").bold()
+                        Picker("", selection: $nekoSkin) {
+                            ForEach(availableSkins, id: \.self) { skin in
+                                Text(skin.capitalized).tag(skin)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(width: 200)
                     }
                 }
                 .padding(10)
@@ -328,5 +343,14 @@ struct SettingsView: View {
         try? FileManager.default.removeItem(at: cacheDir)
         try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
         calculateCacheSize()
+    }
+    
+    private var availableSkins: [String] {
+        if let url = Bundle.module.url(forResource: "Skins", withExtension: nil) {
+            if let dirs = try? FileManager.default.contentsOfDirectory(atPath: url.path) {
+                return dirs.filter { !$0.hasPrefix(".") }.sorted()
+            }
+        }
+        return ["neko"]
     }
 }
