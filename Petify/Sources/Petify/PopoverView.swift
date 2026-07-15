@@ -38,6 +38,16 @@ struct PopoverView: View {
             HStack {
                 Spacer()
                 Button(action: {
+                    NotificationCenter.default.post(name: NSNotification.Name("OpenKaraoke"), object: nil)
+                }) {
+                    Image(systemName: "music.mic")
+                        .foregroundColor(.accentColor)
+                        .font(.system(size: 14))
+                }
+                .buttonStyle(.plain)
+                .help("Karaoke Mode")
+                
+                Button(action: {
                     NotificationCenter.default.post(name: NSNotification.Name("OpenSettings"), object: nil)
                 }) {
                     Image(systemName: "gearshape.fill")

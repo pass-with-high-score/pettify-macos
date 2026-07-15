@@ -18,6 +18,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var floatingWindow: FloatingLyricsWindow!
     var nekoWindow: NSWindow?
     var settingsWindow: NSWindow?
+    var karaokeWindow: KaraokeWindow?
     var wasPlayingBeforeSleep = false
     
     func applicationWillFinishLaunching(_ notification: Notification) {
@@ -76,10 +77,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         
-        NotificationCenter.default.addObserver(forName: NSNotification.Name("OpenSettings"), object: nil, queue: nil) { [weak self] _ in
-            Task { @MainActor in
-                self?.openSettings()
-            }
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("OpenSettings"), object: nil, queue: .main) { [weak self] _ in
+            self?.openSettings()
+        }
+        
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("OpenKaraoke"), object: nil, queue: .main) { [weak self] _ in
+            self?.openKaraoke()
+        }
+        
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("CloseKaraoke"), object: nil, queue: .main) { [weak self] _ in
+            self?.karaokeWindow?.close()
         }
         
         NotificationCenter.default.addObserver(forName: NSNotification.Name("QuitApp"), object: nil, queue: .main) { _ in
@@ -139,6 +146,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow?.makeKeyAndOrderFront(nil)
+    }
+    
+    @objc func openKaraoke() {
+        if karaokeWindow == nil {
+            let screenRect = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+            let width: CGFloat = min(1000, screenRect.width * 0.8)
+            let height: CGFloat = min(700, screenRect.height * 0.8)
+            let rect = NSRect(x: screenRect.midX - width/2, y: screenRect.midY - height/2, width: width, height: height)
+            
+            karaokeWindow = KaraokeWindow(contentRect: rect, backing: .buffered, defer: false, state: state)
+            karaokeWindow?.isReleasedWhenClosed = false
+        }
+        
+        // Close popover when opening karaoke
+        if popover.isShown {
+            popover.performClose(nil)
+        }
+        
+        NSApp.activate(ignoringOtherApps: true)
+        karaokeWindow?.makeKeyAndOrderFront(nil)
     }
     
     @objc func quitApp() {
