@@ -2,6 +2,7 @@ import Cocoa
 import SwiftUI
 import MediaPlayer
 import CoreImage
+import UserNotifications
 
 enum EasterEgg {
     case hyperSpeed
@@ -16,6 +17,7 @@ class AppState: ObservableObject {
     @Published var status = TrackStatus(title: "No track", artist: "", thumbnail: "", paused: true, volume: 1.0, percent: 0, position: 0, duration: 0)
     @Published var lyrics: [LyricLine] = []
     @Published var currentLyricIndex: Int = -1
+    @Published var lyricsStatus: String = "" // "", "searching", "found", "not_found"
     @Published var isTop: Bool = false
     @Published var isLeft: Bool = true
     @Published var dominantColor: Color = .white
@@ -25,6 +27,20 @@ class AppState: ObservableObject {
     
     @Published var isShuffled: Bool = false
     @Published var repeatMode: RepeatMode = .off
+    
+    @Published var sleepTimerMinutes: Int = 0 {
+        didSet {
+            if sleepTimerMinutes > 0 {
+                sleepTimerRemainingSeconds = sleepTimerMinutes * 60
+                startSleepTimer()
+            } else {
+                sleepTimerRemainingSeconds = 0
+                stopSleepTimer()
+            }
+        }
+    }
+    @Published var sleepTimerRemainingSeconds: Int = 0
+    private var sleepTimer: Timer?
 
     let ytdlp = YtDlpService()
     @Published var audioPlayer = AudioPlayerService()
@@ -44,6 +60,12 @@ class AppState: ObservableObject {
         
         // Auto-cleanup cache on startup
         performCacheCleanup()
+
+        // Load EQ preset
+        let savedPreset = UserDefaults.standard.string(forKey: "eqPreset") ?? "Flat"
+        if let preset = EQPreset(rawValue: savedPreset) {
+            audioPlayer.applyEQPreset(preset)
+        }
 
         audioPlayer.onTrackFinished = { [weak self] in
             Task { @MainActor in
@@ -92,6 +114,38 @@ class AppState: ObservableObject {
         } else {
             status.percent = 0
         }
+    }
+    
+    // MARK: - Sleep Timer
+    
+    private func startSleepTimer() {
+        sleepTimer?.invalidate()
+        sleepTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            Task { @MainActor in
+                if self.sleepTimerRemainingSeconds > 0 {
+                    self.sleepTimerRemainingSeconds -= 1
+                    if self.sleepTimerRemainingSeconds <= 0 {
+                        self.sleepTimerMinutes = 0
+                        self.audioPlayer.pause()
+                        self.status.paused = true
+                        // Send system notification
+                        let center = UNUserNotificationCenter.current()
+                        let content = UNMutableNotificationContent()
+                        content.title = "Sleep Timer Completed"
+                        content.body = "Audio playback has been paused."
+                        content.sound = .default
+                        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+                        try? await center.add(request)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func stopSleepTimer() {
+        sleepTimer?.invalidate()
+        sleepTimer = nil
     }
 
     // MARK: - Controls (post() kept for view compatibility)
@@ -381,39 +435,163 @@ class AppState: ObservableObject {
 
     // MARK: - Lyrics
 
-    func fetchLyrics(for title: String, artist: String = "") {
-        var query = title.components(separatedBy: "(")[0].components(separatedBy: "[")[0].components(separatedBy: "|")[0].components(separatedBy: "｜")[0].trimmingCharacters(in: .whitespaces)
-        if !artist.isEmpty && artist != "Local File" && !query.lowercased().contains(artist.lowercased()) {
-            query += " " + artist
-        }
+    /// Clean YouTube title noise for better lyrics search
+    private func cleanTitle(_ raw: String) -> String {
+        var t = raw
+        // Replace underscores used as separators with spaces
+        t = t.replacingOccurrences(of: "_", with: " ")
         
-        guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "https://lrclib.net/api/search?q=\(encoded)") else { return }
-
-        var request = URLRequest(url: url)
-        request.setValue("AudioCLI/1.0 (https://github.com/nqmgaming/audio-cli)", forHTTPHeaderField: "User-Agent")
-
-        Task {
-            do {
-                let (data, _) = try await URLSession.shared.data(for: request)
-                if let results = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
-                   let first = results.first {
-                    print("Found LRC result: \(first["trackName"] ?? "")")
-                    if let syncedLyrics = first["syncedLyrics"] as? String {
-                        self.parseLRC(syncedLyrics)
-                    } else {
-                        print("No synced lyrics found")
-                        DispatchQueue.main.async { self.lyrics = [] }
-                    }
-                } else {
-                    print("No results from lrclib")
-                    DispatchQueue.main.async { self.lyrics = [] }
-                }
-            } catch {
-                print("LRC Error: \(error)")
-                DispatchQueue.main.async { self.lyrics = [] }
+        // Remove content inside () [] 【】 and the brackets
+        let bracketPatterns = [
+            "\\([^)]*\\)",       // (Official MV), (Lyrics), (feat. X)
+            "\\[[^\\]]*\\]",     // [Official Video], [MV]
+            "【[^】]*】",          // 【MV】
+        ]
+        for p in bracketPatterns {
+            if let regex = try? NSRegularExpression(pattern: p) {
+                t = regex.stringByReplacingMatches(in: t, range: NSRange(t.startIndex..., in: t), withTemplate: "")
             }
         }
+        
+        // Remove known noise phrases (order matters — longer patterns first)
+        let noisePatterns = [
+            "(?i)official\\s*(music\\s*)?video",
+            "(?i)official\\s*visualizer",
+            "(?i)official\\s*audio",
+            "(?i)official\\s*mv",
+            "(?i)official\\s*teaser",
+            "(?i)official\\s*trailer",
+            "(?i)lyric(s)?\\s*video",
+            "(?i)audio\\s*only",
+            "(?i)full\\s*version",
+            "(?i)vietsub(bed)?",
+            "(?i)eng(lish)?\\s*sub(s|titled)?",
+            "(?i)with\\s*lyrics?",
+            "(?i)karaoke",
+            "(?i)instrumental",
+            "(?i)acoustic\\s*version",
+            "(?i)live\\s*performance",
+            "(?i)color\\s*coded",
+            "(?i)rom(anization)?\\s*\\+?\\s*eng",
+            "(?i)\\d{3,4}p",          // 270p, 360p, 720p, 1080p
+            "(?i)\\b[48]k\\b",        // 4k, 8k
+            "(?i)\\bhd\\b",           // HD
+            "(?i)\\bhq\\b",           // HQ
+            "(?i)\\bm/?v\\b",         // MV, M/V
+            "\\|.*$",                  // Everything after |
+            "｜.*$",                   // Full-width |
+        ]
+        for p in noisePatterns {
+            if let regex = try? NSRegularExpression(pattern: p) {
+                t = regex.stringByReplacingMatches(in: t, range: NSRange(t.startIndex..., in: t), withTemplate: "")
+            }
+        }
+        
+        // Remove trailing " - " with leftover noise (e.g. " - 270p" already stripped leaves " - ")
+        t = t.replacingOccurrences(of: "\\s*-\\s*$", with: "", options: .regularExpression)
+        // Remove leading " - " leftover
+        t = t.replacingOccurrences(of: "^\\s*-\\s*", with: "", options: .regularExpression)
+        // Collapse whitespace & trim
+        t = t.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression).trimmingCharacters(in: .whitespaces)
+        return t
+    }
+
+    func fetchLyrics(for title: String, artist: String = "") {
+        lyrics = []
+        currentLyricIndex = -1
+        lyricsStatus = "searching"
+
+        let cleanedTitle = cleanTitle(title)
+        let cleanedArtist = (artist == "Local File" || artist.isEmpty) ? "" : artist
+
+        Task {
+            // Strategy 1: Try exact match API first (faster, more accurate)
+            if !cleanedArtist.isEmpty {
+                if await tryExactMatch(trackName: cleanedTitle, artistName: cleanedArtist) {
+                    return
+                }
+            }
+
+            // Strategy 2: Search with cleaned title + artist
+            var query = cleanedTitle
+            if !cleanedArtist.isEmpty && !query.lowercased().contains(cleanedArtist.lowercased()) {
+                query += " " + cleanedArtist
+            }
+            if await trySearch(query: query) { return }
+
+            // Strategy 3: Search with title only (artist may be wrong or confusing)
+            if !cleanedArtist.isEmpty {
+                if await trySearch(query: cleanedTitle) { return }
+            }
+
+            // Strategy 4: Try raw title (first part before dash which is common: "Artist - Title")
+            let dashParts = title.components(separatedBy: " - ")
+            if dashParts.count >= 2 {
+                let altTitle = dashParts.dropFirst().joined(separator: " - ")
+                let altArtist = dashParts[0].trimmingCharacters(in: .whitespaces)
+                let cleanAlt = cleanTitle(altTitle)
+                if await tryExactMatch(trackName: cleanAlt, artistName: altArtist) { return }
+                if await trySearch(query: "\(cleanAlt) \(altArtist)") { return }
+            }
+
+            // No luck
+            print("No lyrics found after all strategies")
+            self.lyricsStatus = "not_found"
+        }
+    }
+
+    private func tryExactMatch(trackName: String, artistName: String) async -> Bool {
+        guard let tEnc = trackName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let aEnc = artistName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://lrclib.net/api/get?track_name=\(tEnc)&artist_name=\(aEnc)") else { return false }
+        var req = URLRequest(url: url)
+        req.setValue("AudioCLI/1.0 (https://github.com/nqmgaming/audio-cli)", forHTTPHeaderField: "User-Agent")
+        do {
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else { return false }
+            if let result = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let syncedLyrics = result["syncedLyrics"] as? String, !syncedLyrics.isEmpty {
+                print("Exact match found: \(result["trackName"] ?? "")")
+                self.parseLRC(syncedLyrics)
+                self.lyricsStatus = "found"
+                return true
+            }
+        } catch {
+            print("Exact match error: \(error)")
+        }
+        return false
+    }
+
+    private func trySearch(query: String) async -> Bool {
+        guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://lrclib.net/api/search?q=\(encoded)") else { return false }
+        var req = URLRequest(url: url)
+        req.setValue("AudioCLI/1.0 (https://github.com/nqmgaming/audio-cli)", forHTTPHeaderField: "User-Agent")
+        do {
+            let (data, _) = try await URLSession.shared.data(for: req)
+            if let results = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                // Prefer results with synced lyrics
+                let withSynced = results.filter { ($0["syncedLyrics"] as? String)?.isEmpty == false }
+                if let best = withSynced.first ?? results.first {
+                    if let syncedLyrics = best["syncedLyrics"] as? String, !syncedLyrics.isEmpty {
+                        print("Search found: \(best["trackName"] ?? "") (query: \(query))")
+                        self.parseLRC(syncedLyrics)
+                        self.lyricsStatus = "found"
+                        return true
+                    }
+                }
+            }
+        } catch {
+            print("Search error for '\(query)': \(error)")
+        }
+        return false
+    }
+
+    func retryLyrics() {
+        lastSearchedTitle = ""
+        guard currentTrackIndex >= 0 && currentTrackIndex < tracks.count else { return }
+        let track = tracks[currentTrackIndex]
+        fetchLyrics(for: track.title, artist: track.artist)
     }
 
     func parseLRC(_ lrc: String) {

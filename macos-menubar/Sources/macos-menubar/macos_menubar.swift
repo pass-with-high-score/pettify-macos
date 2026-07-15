@@ -16,6 +16,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var popover: NSPopover!
     let state = AppState()
     var floatingWindow: FloatingLyricsWindow!
+    var nekoWindow: NSWindow?
     var settingsWindow: NSWindow?
     var wasPlayingBeforeSleep = false
     
@@ -48,6 +49,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             floatingWindow.makeKeyAndOrderFront(nil)
             floatingWindow.snapToCorner()
         }
+        
+        // Setup neko screen-edge window
+        setupNekoScreenEdge()
+        
         NotificationCenter.default.addObserver(forName: NSNotification.Name("ToggleFloatingLyrics"), object: nil, queue: .main) { [weak self] notification in
             let showVal = notification.object as? Bool
             DispatchQueue.main.async {
@@ -129,5 +134,49 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc func quitApp() {
         NSApplication.shared.terminate(self)
+    }
+    
+    func setupNekoScreenEdge() {
+        let isScreenEdge = UserDefaults.standard.bool(forKey: "nekoScreenEdge")
+        if isScreenEdge {
+            showNekoScreenWindow()
+        }
+        
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("ToggleNekoMode"), object: nil, queue: .main) { [weak self] notification in
+            guard let self = self else { return }
+            let screenEdge = notification.object as? Bool ?? false
+            Task { @MainActor in
+                if screenEdge {
+                    self.showNekoScreenWindow()
+                } else {
+                    self.nekoWindow?.orderOut(nil)
+                    self.nekoWindow = nil
+                }
+            }
+        }
+    }
+    
+    func showNekoScreenWindow() {
+        if nekoWindow != nil { return }
+        guard let screen = NSScreen.main else { return }
+        let screenFrame = screen.frame
+        
+        let window = NSWindow(
+            contentRect: screenFrame,
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.level = .floating
+        window.hasShadow = false
+        window.ignoresMouseEvents = true
+        window.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
+        
+        let nekoView = OnekoView(state: state)
+        window.contentView = NSHostingView(rootView: nekoView)
+        window.makeKeyAndOrderFront(nil)
+        nekoWindow = window
     }
 }

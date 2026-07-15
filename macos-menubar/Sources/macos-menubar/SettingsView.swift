@@ -8,11 +8,15 @@ struct SettingsView: View {
     
     @AppStorage("floatingOpacity") private var floatingOpacity = 1.0
     @AppStorage("floatingFontSize") private var floatingFontSize = 36.0
-    
     @AppStorage("nekoSkin") private var nekoSkin = "neko"
+    @AppStorage("nekoSpeed") private var nekoSpeed = 4.0
+    @AppStorage("nekoSize") private var nekoSize = 32.0
+    @AppStorage("nekoWallClaw") private var nekoWallClaw = true
+    @AppStorage("nekoScreenEdge") private var nekoScreenEdge = false
     
     @AppStorage("audioQuality") private var audioQuality = "bestaudio"
     @AppStorage("defaultVolume") private var defaultVolume = 1.0
+    @AppStorage("eqPreset") private var eqPreset = "Flat"
     
     @AppStorage("maxCacheSizeGB") private var maxCacheSizeGB = 2.0
     
@@ -29,6 +33,7 @@ struct SettingsView: View {
                 SidebarItem(title: "Appearance", icon: "paintpalette", isSelected: selectedTab == "appearance") { selectedTab = "appearance" }
                 SidebarItem(title: "Playback", icon: "play.circle", isSelected: selectedTab == "playback") { selectedTab = "playback" }
                 SidebarItem(title: "Storage", icon: "externaldrive", isSelected: selectedTab == "storage") { selectedTab = "storage" }
+                SidebarItem(title: "About", icon: "info.circle", isSelected: selectedTab == "about") { selectedTab = "about" }
                 Spacer()
             }
             .padding(.top, 20)
@@ -50,6 +55,8 @@ struct SettingsView: View {
                         playbackContent
                     case "storage":
                         storageContent
+                    case "about":
+                        aboutContent
                     default:
                         EmptyView()
                     }
@@ -86,6 +93,59 @@ struct SettingsView: View {
                 .cornerRadius(6)
             }
             .buttonStyle(.plain)
+        }
+    }
+    
+    private var aboutContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack(spacing: 20) {
+                Image(nsImage: NSImage(named: NSImage.applicationIconName) ?? NSImage())
+                    .resizable()
+                    .frame(width: 80, height: 80)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Antigravity Player")
+                        .font(.largeTitle)
+                        .bold()
+                    Text("Version 1.0.0")
+                        .foregroundColor(.secondary)
+                    Text("A premium, lightweight music player for macOS.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.bottom, 10)
+            
+            GroupBox("Keyboard Shortcuts") {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Play / Pause")
+                        Spacer()
+                        Text("Space").padding(4).background(Color.secondary.opacity(0.2)).cornerRadius(4)
+                    }
+                    Divider()
+                    HStack {
+                        Text("Next Track")
+                        Spacer()
+                        Text("Right Arrow").padding(4).background(Color.secondary.opacity(0.2)).cornerRadius(4)
+                    }
+                    Divider()
+                    HStack {
+                        Text("Previous Track")
+                        Spacer()
+                        Text("Left Arrow").padding(4).background(Color.secondary.opacity(0.2)).cornerRadius(4)
+                    }
+                }
+                .padding(12)
+            }
+            
+            VStack(alignment: .center) {
+                Spacer()
+                Text("Made with ❤️ by Antigravity")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity)
+            }
         }
     }
     
@@ -153,33 +213,85 @@ struct SettingsView: View {
                     
                     Divider()
                     
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Desktop Pet Skin").bold()
-                        HStack(spacing: 16) {
-                            Picker("", selection: $nekoSkin) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Desktop Pet Settings").font(.headline)
+                        
+                        Picker("Pet Mode", selection: $nekoScreenEdge) {
+                            Text("Inside Lyrics Window").tag(false)
+                            Text("Screen Edge (Full Desktop)").tag(true)
+                        }
+                        .pickerStyle(.radioGroup)
+                        .onChange(of: nekoScreenEdge) { newValue in
+                            NotificationCenter.default.post(name: NSNotification.Name("ToggleNekoMode"), object: newValue)
+                        }
+                        
+                        Toggle("Enable Wall Clawing Animation", isOn: $nekoWallClaw)
+                        
+                        HStack {
+                            Text("Pet Speed")
+                            Slider(value: $nekoSpeed, in: 1.0...10.0, step: 1.0)
+                            Text(String(format: "%.0f", nekoSpeed)).monospacedDigit().frame(width: 30)
+                        }
+                        
+                        HStack {
+                            Text("Pet Size")
+                            Slider(value: $nekoSize, in: 16.0...64.0, step: 8.0)
+                            Text(String(format: "%.0f", nekoSize)).monospacedDigit().frame(width: 30)
+                        }
+                        
+                        Text("Choose Pet Skin").font(.subheadline).bold().padding(.top, 8)
+                        
+                        ScrollView {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 60))], spacing: 16) {
                                 ForEach(availableSkins, id: \.self) { skin in
-                                    Text(skin.capitalized).tag(skin)
+                                    VStack {
+                                        ZStack {
+                                            if skin == nekoSkin {
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .fill(Color.accentColor.opacity(0.3))
+                                                    .frame(width: 56, height: 56)
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .stroke(Color.accentColor, lineWidth: 2)
+                                                    .frame(width: 56, height: 56)
+                                            } else {
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .fill(Color.secondary.opacity(0.1))
+                                                    .frame(width: 56, height: 56)
+                                            }
+                                            
+                                            if let url = Bundle.module.url(forResource: "awake", withExtension: "png", subdirectory: "Skins/\(skin)"),
+                                               let nsImage = NSImage(contentsOf: url) {
+                                                Image(nsImage: nsImage)
+                                                    .resizable()
+                                                    .interpolation(.none)
+                                                    .frame(width: 32, height: 32)
+                                            } else if let fallbackUrl = Bundle.module.url(forResource: "awake", withExtension: "png", subdirectory: "Skins/neko"),
+                                                      let fallbackImage = NSImage(contentsOf: fallbackUrl) {
+                                                Image(nsImage: fallbackImage)
+                                                    .resizable()
+                                                    .interpolation(.none)
+                                                    .frame(width: 32, height: 32)
+                                            }
+                                        }
+                                        Text(skin.capitalized)
+                                            .font(.system(size: 10))
+                                            .lineLimit(1)
+                                            .truncationMode(.tail)
+                                    }
+                                    .onTapGesture {
+                                        withAnimation { nekoSkin = skin }
+                                    }
                                 }
                             }
-                            .pickerStyle(.menu)
-                            .frame(width: 200)
-                            
-                            if let url = Bundle.module.url(forResource: "awake", withExtension: "png", subdirectory: "Skins/\(nekoSkin)"),
-                               let nsImage = NSImage(contentsOf: url) {
-                                Image(nsImage: nsImage)
-                                    .resizable()
-                                    .interpolation(.none)
-                                    .frame(width: 32, height: 32)
-                                    .shadow(color: .black.opacity(0.3), radius: 1)
-                            } else if let fallbackUrl = Bundle.module.url(forResource: "awake", withExtension: "png", subdirectory: "Skins/neko"),
-                                      let fallbackImage = NSImage(contentsOf: fallbackUrl) {
-                                Image(nsImage: fallbackImage)
-                                    .resizable()
-                                    .interpolation(.none)
-                                    .frame(width: 32, height: 32)
-                                    .shadow(color: .black.opacity(0.3), radius: 1)
-                            }
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 8)
                         }
+                        .frame(height: 200)
+                        .background(Color(NSColor.controlBackgroundColor))
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8).stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                        )
                     }
                 }
                 .padding(10)
@@ -241,10 +353,73 @@ struct SettingsView: View {
                 .padding(12)
             }
             
+            GroupBox("Equalizer") {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Text("Preset")
+                        Spacer()
+                        Picker("", selection: $eqPreset) {
+                            ForEach(EQPreset.allCases, id: \.self) { preset in
+                                Text(preset.rawValue).tag(preset.rawValue)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(width: 200)
+                        .onChange(of: eqPreset) { newValue in
+                            if let preset = EQPreset(rawValue: newValue) {
+                                state.audioPlayer.applyEQPreset(preset)
+                            }
+                        }
+                    }
+                    
+                    // 10-Band EQ UI
+                    let frequencies = ["32", "64", "125", "250", "500", "1k", "2k", "4k", "8k", "16k"]
+                    HStack(spacing: 8) {
+                        ForEach(0..<10, id: \.self) { index in
+                            VStack(spacing: 6) {
+                                let gain = state.audioPlayer.eqBands[index]
+                                Text(String(format: "%.0f", gain))
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.secondary)
+                                    .frame(height: 12)
+                                
+                                Slider(value: Binding(
+                                    get: { gain },
+                                    set: { val in
+                                        eqPreset = "Custom"
+                                        state.audioPlayer.setEQBand(index: index, gain: val)
+                                    }
+                                ), in: -24.0...24.0)
+                                .frame(height: 100)
+                                .rotationEffect(.degrees(-90))
+                                .frame(width: 20, height: 100)
+                                
+                                Text(frequencies[index])
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundColor(.primary)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    
+                    HStack {
+                        Spacer()
+                        Button("Reset to Flat") {
+                            eqPreset = "Flat"
+                            state.audioPlayer.applyEQPreset(.flat)
+                        }
+                        .buttonStyle(.link)
+                        .font(.caption)
+                    }
+                }
+                .padding(12)
+            }
+            
             GroupBox("Audio Effects") {
                 VStack(spacing: 20) {
                     // Playback Speed
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Text("Playback Speed")
                             Spacer()
@@ -263,12 +438,27 @@ struct SettingsView: View {
                             Slider(value: $state.audioPlayer.rate, in: 0.5...2.0, step: 0.05)
                             Image(systemName: "hare.fill").foregroundColor(.secondary).font(.caption)
                         }
+                        
+                        HStack(spacing: 8) {
+                            ForEach([0.5, 0.75, 1.0, 1.25, 1.5, 2.0], id: \.self) { val in
+                                Button("\(val, specifier: "%.2f")x") {
+                                    state.audioPlayer.rate = Float(val)
+                                }
+                                .font(.system(size: 10))
+                                .buttonStyle(.borderless)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(state.audioPlayer.rate == Float(val) ? Color.accentColor : Color.secondary.opacity(0.2))
+                                .foregroundColor(state.audioPlayer.rate == Float(val) ? .white : .primary)
+                                .cornerRadius(4)
+                            }
+                        }
                     }
                     
                     Divider()
                     
                     // Pitch Shift
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Text("Pitch Shift")
                             Spacer()
@@ -289,6 +479,61 @@ struct SettingsView: View {
                             Slider(value: $state.audioPlayer.pitch, in: -1200...1200, step: 100)
                             Text("+12").foregroundColor(.secondary).font(.caption)
                         }
+                        
+                        HStack(spacing: 8) {
+                            ForEach([-12, -2, 0, 2, 12], id: \.self) { val in
+                                let sign = val > 0 ? "+" : ""
+                                Button("\(sign)\(val)") {
+                                    state.audioPlayer.pitch = Float(val * 100)
+                                }
+                                .font(.system(size: 10))
+                                .buttonStyle(.borderless)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(Int(state.audioPlayer.pitch/100) == val ? Color.accentColor : Color.secondary.opacity(0.2))
+                                .foregroundColor(Int(state.audioPlayer.pitch/100) == val ? .white : .primary)
+                                .cornerRadius(4)
+                            }
+                        }
+                    }
+                }
+                .padding(12)
+            }
+            
+            GroupBox("Sleep Timer") {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Text("Stop playing after:")
+                        Spacer()
+                        Picker("", selection: $state.sleepTimerMinutes) {
+                            Text("Off").tag(0)
+                            Text("15 minutes").tag(15)
+                            Text("30 minutes").tag(30)
+                            Text("45 minutes").tag(45)
+                            Text("60 minutes").tag(60)
+                            Text("90 minutes").tag(90)
+                            Text("120 minutes").tag(120)
+                        }
+                        .pickerStyle(.menu)
+                        .frame(width: 150)
+                    }
+                    
+                    if state.sleepTimerMinutes > 0 {
+                        HStack {
+                            Image(systemName: "timer")
+                            let remaining = state.sleepTimerRemainingSeconds
+                            let m = remaining / 60
+                            let s = remaining % 60
+                            Text(String(format: "%02d:%02d remaining", m, s))
+                                .monospacedDigit()
+                            Spacer()
+                            Button("Cancel") {
+                                state.sleepTimerMinutes = 0
+                            }
+                            .buttonStyle(.link)
+                        }
+                        .foregroundColor(.secondary)
+                        .font(.subheadline)
                     }
                 }
                 .padding(12)

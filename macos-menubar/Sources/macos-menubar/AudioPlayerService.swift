@@ -22,6 +22,15 @@ final class AudioPlayerService: NSObject, ObservableObject {
     
     @Published var currentOutputDeviceID: AudioDeviceID = 0
     
+    @Published var eqBands: [Float] = Array(repeating: 0.0, count: 10) {
+        didSet {
+            guard eqBands.count == eq.bands.count else { return }
+            for i in 0..<eq.bands.count {
+                eq.bands[i].gain = eqBands[i]
+            }
+        }
+    }
+    
     private var hasLoadedFile: Bool = false
     
     // MARK: Callback
@@ -173,8 +182,15 @@ final class AudioPlayerService: NSObject, ObservableObject {
     }
     
     func setEQBand(index: Int, gain: Float) {
-        guard index >= 0 && index < eq.bands.count else { return }
-        eq.bands[index].gain = max(-24.0, min(24.0, gain))
+        guard index >= 0 && index < eqBands.count else { return }
+        eqBands[index] = max(-24.0, min(24.0, gain))
+    }
+    
+    func applyEQPreset(_ preset: EQPreset) {
+        guard preset != .custom else { return }
+        let gains = preset.gains
+        guard gains.count == eqBands.count else { return }
+        eqBands = gains
     }
 
     func stop() {

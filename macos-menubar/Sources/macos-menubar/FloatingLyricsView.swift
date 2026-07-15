@@ -223,7 +223,13 @@ struct FloatingLyricsView: View {
                 .animation(state.currentEasterEgg == .raveMode ? .linear(duration: 2) : .default, value: state.currentEasterEgg)
             )
             .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 4)
-            .overlay(OnekoView(state: state))
+            .overlay(
+                Group {
+                    if !UserDefaults.standard.bool(forKey: "nekoScreenEdge") {
+                        OnekoView(state: state)
+                    }
+                }
+            )
             .onHover { hovering in
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                     isHovering = hovering

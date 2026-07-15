@@ -158,6 +158,31 @@ struct PopoverView: View {
                 }
                 .frame(height: 44)
                 .animation(.easeInOut(duration: 0.3), value: state.currentLyricIndex)
+            } else if state.lyricsStatus == "searching" {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Searching lyrics...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(height: 28)
+            } else if state.lyricsStatus == "not_found" {
+                HStack(spacing: 6) {
+                    Image(systemName: "music.note")
+                        .foregroundColor(.secondary)
+                    Text("No lyrics found")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Button(action: { state.retryLyrics() }) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Retry")
+                        }
+                        .font(.caption)
+                    }
+                    .buttonStyle(.borderless)
+                }
+                .frame(height: 28)
             }
             
             // 4. Progress Bar
