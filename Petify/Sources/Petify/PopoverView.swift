@@ -43,6 +43,8 @@ struct PopoverView: View {
                     Image(systemName: "music.mic")
                         .foregroundColor(.accentColor)
                         .font(.system(size: 14))
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .help("Karaoke Mode")
@@ -53,6 +55,8 @@ struct PopoverView: View {
                     Image(systemName: "gearshape.fill")
                         .foregroundColor(.secondary)
                         .font(.system(size: 14))
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .help("Settings")
@@ -63,6 +67,8 @@ struct PopoverView: View {
                     Image(systemName: "power")
                         .foregroundColor(.secondary)
                         .font(.system(size: 14))
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .help("Quit")
