@@ -157,56 +157,108 @@ struct SettingsView: View {
     
     private var playbackContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Playback").font(.title2).bold()
+            Text("Playback Settings").font(.title2).bold()
             
-            GroupBox {
-                VStack(alignment: .leading, spacing: 20) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Audio Quality (yt-dlp)").bold()
+            GroupBox("General") {
+                VStack(spacing: 16) {
+                    HStack {
+                        Text("Audio Quality")
+                        Spacer()
                         Picker("", selection: $audioQuality) {
-                            Text("Best Audio (Recommended)").tag("bestaudio")
+                            Text("Best Audio").tag("bestaudio")
                             Text("256 kbps (High Quality)").tag("256k")
                             Text("128 kbps (Data Saver)").tag("128k")
                         }
                         .pickerStyle(.menu)
+                        .frame(width: 220)
                     }
                     
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Default Startup Volume: \(Int(defaultVolume * 100))%").bold()
-                        Slider(value: $defaultVolume, in: 0.0...1.0, step: 0.05)
+                    HStack {
+                        Text("Default Volume")
+                        Spacer()
+                        HStack {
+                            Image(systemName: "speaker.fill").foregroundColor(.secondary).font(.caption)
+                            Slider(value: $defaultVolume, in: 0.0...1.0, step: 0.05)
+                                .frame(width: 150)
+                            Image(systemName: "speaker.wave.3.fill").foregroundColor(.secondary).font(.caption)
+                        }
+                        Text("\(Int(defaultVolume * 100))%")
+                            .frame(width: 45, alignment: .trailing)
+                            .monospacedDigit()
                     }
                     
-                    Divider()
-                    
-                    Text("Audio Engine (AVAudioEngine)").bold()
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Playback Speed: \(String(format: "%.1fx", state.audioPlayer.rate))").bold()
-                        Slider(value: $state.audioPlayer.rate, in: 0.5...2.0, step: 0.1)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Pitch Shift: \(Int(state.audioPlayer.pitch)) cents").bold()
-                        Slider(value: $state.audioPlayer.pitch, in: -1200...1200, step: 100)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Output Device").bold()
+                    HStack {
+                        Text("Output Device")
+                        Spacer()
                         let devices = state.audioPlayer.getOutputDevices()
                         Picker("", selection: Binding(
                             get: { return Int(state.audioPlayer.currentOutputDeviceID) },
                             set: { id in state.audioPlayer.setOutputDevice(id: UInt32(id)) }
                         )) {
                             Text("System Default").tag(0)
+                            Divider()
                             ForEach(devices, id: \.id) { device in
                                 Text(device.name).tag(Int(device.id))
                             }
                         }
                         .pickerStyle(.menu)
+                        .frame(width: 220)
                     }
                 }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+            }
+            
+            GroupBox("Audio Effects") {
+                VStack(spacing: 20) {
+                    // Playback Speed
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Playback Speed")
+                            Spacer()
+                            Text(String(format: "%.2fx", state.audioPlayer.rate))
+                                .monospacedDigit()
+                                .foregroundColor(.accentColor)
+                            Button(action: { state.audioPlayer.rate = 1.0 }) {
+                                Image(systemName: "arrow.counterclockwise.circle")
+                            }
+                            .buttonStyle(.plain)
+                            .help("Reset to 1.0x")
+                        }
+                        
+                        HStack {
+                            Image(systemName: "tortoise.fill").foregroundColor(.secondary).font(.caption)
+                            Slider(value: $state.audioPlayer.rate, in: 0.5...2.0, step: 0.05)
+                            Image(systemName: "hare.fill").foregroundColor(.secondary).font(.caption)
+                        }
+                    }
+                    
+                    Divider()
+                    
+                    // Pitch Shift
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Pitch Shift")
+                            Spacer()
+                            let semitones = Int(state.audioPlayer.pitch / 100)
+                            let sign = semitones > 0 ? "+" : ""
+                            Text("\(sign)\(semitones) semitones")
+                                .monospacedDigit()
+                                .foregroundColor(.accentColor)
+                            Button(action: { state.audioPlayer.pitch = 0.0 }) {
+                                Image(systemName: "arrow.counterclockwise.circle")
+                            }
+                            .buttonStyle(.plain)
+                            .help("Reset to 0")
+                        }
+                        
+                        HStack {
+                            Text("-12").foregroundColor(.secondary).font(.caption)
+                            Slider(value: $state.audioPlayer.pitch, in: -1200...1200, step: 100)
+                            Text("+12").foregroundColor(.secondary).font(.caption)
+                        }
+                    }
+                }
+                .padding(12)
             }
         }
     }
