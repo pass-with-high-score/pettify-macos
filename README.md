@@ -1,48 +1,45 @@
-# Audio CLI
+# Audio CLI (macOS Menubar Edition)
 
-A clean, professional Terminal User Interface (TUI) music player for macOS written in Go.
+A beautifully designed, feature-rich macOS menubar audio player built with SwiftUI. Originally a Go TUI application, it has now been fully reimagined as a native macOS application.
 
 ## Features
 
-- **Multi-format Support**: Plays `.mp3`, `.wav`, `.ogg`, and `.flac`.
-- **Real-time Waveform**: Visual representation of the audio signal.
-- **Clean TUI**: Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lip Gloss](https://github.com/charmbracelet/lipgloss).
-- **A-B Repeat**: Mark start (`[`) and end (`]`) points to loop a specific segment.
-- **Metadata Support**: Displays Artist and Title from ID3 tags.
-- **Playlist Management**: Support for folder playback, shuffle, and loop modes.
-- **Search**: Instant filtering of your playlist with `/`.
-- **Advanced Controls**:
-    - `Space`: Play/Pause
-    - `N` / `P`: Next/Previous track
-    - `Left` / `Right`: Seek backward/forward 10s
-    - `Up` / `Down`: Volume control
-    - `[` / `]`: Set A-B Repeat points
-    - `\`: Clear A-B Repeat
-    - `/`: Search playlist
-    - `L` / `S`: Toggle Loop/Shuffle
-    - `Q`: Quit
+- **Menubar Player**: Quick access to your music right from the macOS menubar.
+- **YouTube Support**: Paste any YouTube link (or search query) to instantly stream audio, powered by `yt-dlp`.
+- **Local Audio**: Drag and drop local audio files (`.mp3`, `.wav`, etc.) directly into the app.
+- **Floating Lyrics**: A highly customizable floating window for lyrics that stays on top.
+  - **Animations**: Choose from Slide, Scale, Blur, 3D Flip, Random per Song, or Random per Line.
+  - **Styles**: Customize font styles (Rounded, Serif, Monospaced) and colors (Dynamic, Pink, Yellow, White).
+- **Desktop Pet (Neko)**: An animated pet that follows your mouse or roams the screen edge. Choose from dozens of custom skins!
+- **Audio Visualizer**: Real-time visualizer built right into the UI.
+- **Spinning Vinyl Art**: Dynamic album art that spins while playing, complete with interactive Easter eggs (e.g. reverse spin, DJ scratch, hyper speed).
 
-## Installation
+## Requirements
 
-### Prerequisites
+- macOS 12.0+
+- Xcode Command Line Tools or Xcode
 
-- Go 1.16+
-- macOS (uses `AudioToolbox.framework`)
-- Xcode Command Line Tools (`xcode-select --install`)
+## Installation & Build
 
-### Build from source
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/pass-with-high-score/audio-cli.git
+   cd audio-cli
+   ```
 
-```bash
-git clone https://github.com/pass-with-high-score/audio-cli.git
-cd audio-cli
-go build -o audio-cli main.go
-```
+2. Open the Swift package and build:
+   ```bash
+   cd macos-menubar
+   swift build -c release
+   ```
+   Or open `macos-menubar/Package.swift` in Xcode and click Run.
 
 ## Usage
 
-```bash
-./audio-cli <path-to-folder-or-file> [-shuffle] [-loop]
-```
+- Click the menubar icon to open the player.
+- Paste a YouTube URL or type a search query in the text field to play a song.
+- Drag & Drop an audio file into the popover to play locally.
+- Access **Settings** (gear icon) to tweak lyrics animations, desktop pet behaviors, and audio quality.
 
 ## License
 
