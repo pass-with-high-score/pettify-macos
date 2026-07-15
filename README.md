@@ -1,4 +1,4 @@
-# Audio CLI (macOS Menubar Edition)
+# Petify (macOS Menubar Edition)
 
 A beautifully designed, feature-rich macOS menubar audio player built with SwiftUI. Originally a Go TUI application, it has now been fully reimagined as a native macOS application.
 
@@ -29,10 +29,10 @@ A beautifully designed, feature-rich macOS menubar audio player built with Swift
 
 2. Open the Swift package and build:
    ```bash
-   cd macos-menubar
+   cd Petify
    swift build -c release
    ```
-   Or open `macos-menubar/Package.swift` in Xcode and click Run.
+   Or open `Petify/Package.swift` in Xcode and click Run.
 
 ## Usage
 

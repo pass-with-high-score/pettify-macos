@@ -2,3 +2,8 @@ go-play-audio
 .gemini/
 go-play-audio.skill
 .DS_Store
+
+Petify.dmg
+petify_logo.png
+remove_bg.py
+Petify/.build/
