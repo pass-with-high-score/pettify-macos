@@ -61,7 +61,7 @@ cat > "${CONTENTS_DIR}/Info.plist" <<EOF
     <key>CFBundleExecutable</key>
     <string>${APP_NAME}</string>
     <key>CFBundleIdentifier</key>
-    <string>com.yourdomain.${APP_NAME}</string>
+    <string>app.pwhs.${APP_NAME}</string>
     <key>CFBundleName</key>
     <string>${APP_NAME}</string>
     <key>CFBundleIconFile</key>
