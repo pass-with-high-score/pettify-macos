@@ -155,13 +155,31 @@ struct SettingsView: View {
                     
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Desktop Pet Skin").bold()
-                        Picker("", selection: $nekoSkin) {
-                            ForEach(availableSkins, id: \.self) { skin in
-                                Text(skin.capitalized).tag(skin)
+                        HStack(spacing: 16) {
+                            Picker("", selection: $nekoSkin) {
+                                ForEach(availableSkins, id: \.self) { skin in
+                                    Text(skin.capitalized).tag(skin)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .frame(width: 200)
+                            
+                            if let url = Bundle.module.url(forResource: "awake", withExtension: "png", subdirectory: "Skins/\(nekoSkin)"),
+                               let nsImage = NSImage(contentsOf: url) {
+                                Image(nsImage: nsImage)
+                                    .resizable()
+                                    .interpolation(.none)
+                                    .frame(width: 32, height: 32)
+                                    .shadow(color: .black.opacity(0.3), radius: 1)
+                            } else if let fallbackUrl = Bundle.module.url(forResource: "awake", withExtension: "png", subdirectory: "Skins/neko"),
+                                      let fallbackImage = NSImage(contentsOf: fallbackUrl) {
+                                Image(nsImage: fallbackImage)
+                                    .resizable()
+                                    .interpolation(.none)
+                                    .frame(width: 32, height: 32)
+                                    .shadow(color: .black.opacity(0.3), radius: 1)
                             }
                         }
-                        .pickerStyle(.menu)
-                        .frame(width: 200)
                     }
                 }
                 .padding(10)
