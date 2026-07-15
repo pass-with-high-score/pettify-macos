@@ -6,14 +6,21 @@ import MediaPlayer
 struct MenuBarApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     var body: some Scene {
+        WindowGroup {
+            PopoverView(state: appDelegate.state)
+                .frame(minWidth: 350, minHeight: 600)
+                .onAppear {
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+        }
+        .windowStyle(.hiddenTitleBar)
+        
         Settings { SettingsView(state: appDelegate.state) }
     }
 }
 
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
-    var statusItem: NSStatusItem!
-    var popover: NSPopover!
     let state = AppState()
     var floatingWindow: FloatingLyricsWindow!
     var nekoWindow: NSWindow?
@@ -22,12 +29,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var wasPlayingBeforeSleep = false
     
     func applicationWillFinishLaunching(_ notification: Notification) {
-        let showDockIcon = UserDefaults.standard.bool(forKey: "showDockIcon")
-        if showDockIcon {
-            NSApp.setActivationPolicy(.regular)
-        } else {
-            NSApp.setActivationPolicy(.accessory)
-        }
+        NSApp.setActivationPolicy(.regular)
         
         // Set app icon
         if let icon = Bundle.module.image(forResource: "AppIcon") {
@@ -36,18 +38,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let contentView = PopoverView(state: state)
-        popover = NSPopover()
-        popover.contentSize = NSSize(width: 260, height: 450)
-        popover.behavior = .transient
-        popover.contentViewController = NSHostingController(rootView: contentView)
-        
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "music.note", accessibilityDescription: "Petify")
-            button.action = #selector(togglePopover(_:))
-        }
-        
         let screenRect = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let floatingRect = NSRect(x: screenRect.minX, y: screenRect.minY, width: screenRect.width / 2, height: 500)
         let floatingContentView = FloatingLyricsView(state: state)
@@ -120,16 +110,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
     }
-    
-    @objc func togglePopover(_ sender: AnyObject?) {
-        if let button = statusItem.button {
-            if popover.isShown {
-                popover.performClose(sender)
-            } else {
-                popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            }
-        }
-    }
+
     
     @objc func openSettings() {
         if settingsWindow == nil {
@@ -159,11 +140,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
             karaokeWindow = KaraokeWindow(contentRect: rect, backing: .buffered, defer: false, state: state)
             karaokeWindow?.isReleasedWhenClosed = false
-        }
-        
-        // Close popover when opening karaoke
-        if popover.isShown {
-            popover.performClose(nil)
         }
         
         NSApp.activate(ignoringOtherApps: true)

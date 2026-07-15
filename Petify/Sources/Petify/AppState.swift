@@ -723,12 +723,6 @@ class AppState: ObservableObject {
         
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
 
-        DispatchQueue.main.async {
-            if let delegate = NSApp.delegate as? AppDelegate, let button = delegate.statusItem?.button {
-                let iconName = self.status.paused ? "music.note" : "waveform"
-                button.image = NSImage(systemSymbolName: iconName, accessibilityDescription: "Petify")
-            }
-        }
     }
     
     private func sendTrackNotification(track: TrackInfo) {
