@@ -10,9 +10,9 @@ MACOS_DIR="${CONTENTS_DIR}/MacOS"
 RESOURCES_DIR="${CONTENTS_DIR}/Resources"
 BUILD_DIR="Petify/.build/release"
 
-echo "🔨 Building Swift package..."
+echo "🔨 Building Swift package for Universal macOS (Intel & Apple Silicon)..."
 cd Petify
-swift build -c release
+swift build -c release --arch arm64 --arch x86_64
 cd ..
 
 echo "📦 Creating .app bundle structure..."
