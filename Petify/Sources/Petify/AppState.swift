@@ -788,7 +788,7 @@ class AppState: ObservableObject {
 
     func extractDominantColor(from imageURL: String) {
         guard let url = URL(string: imageURL) else { return }
-        Task {
+        Task.detached {
             do {
                 let data: Data
                 if imageURL.hasPrefix("file://") {
@@ -807,11 +807,11 @@ class AppState: ObservableObject {
                       let outputImage = filter.outputImage else { return }
 
                 var bitmap = [UInt8](repeating: 0, count: 4)
-                let context = CIContext(options: [.workingColorSpace: kCFNull!])
+                let context = CIContext(options: [.workingColorSpace: NSNull()])
                 context.render(outputImage, toBitmap: &bitmap, rowBytes: 4, bounds: CGRect(x: 0, y: 0, width: 1, height: 1), format: .RGBA8, colorSpace: nil)
 
                 let color = Color(red: Double(bitmap[0]) / 255.0, green: Double(bitmap[1]) / 255.0, blue: Double(bitmap[2]) / 255.0)
-                DispatchQueue.main.async {
+                await MainActor.run {
                     self.dominantColor = color
                     self.currentArtwork = nsImage
                     self.updateNowPlaying()
