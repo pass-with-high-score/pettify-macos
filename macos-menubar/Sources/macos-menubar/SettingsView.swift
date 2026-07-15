@@ -8,6 +8,10 @@ struct SettingsView: View {
     
     @AppStorage("floatingOpacity") private var floatingOpacity = 1.0
     @AppStorage("floatingFontSize") private var floatingFontSize = 36.0
+    @AppStorage("lyricsAnimation") private var lyricsAnimation = "slide"
+    @AppStorage("lyricsFont") private var lyricsFont = "rounded"
+    @AppStorage("lyricsColor") private var lyricsColor = "white"
+    
     @AppStorage("nekoSkin") private var nekoSkin = "neko"
     @AppStorage("nekoSpeed") private var nekoSpeed = 4.0
     @AppStorage("nekoSize") private var nekoSize = 32.0
@@ -209,6 +213,41 @@ struct SettingsView: View {
                             Text("Extra Large").tag(64.0)
                         }
                         .pickerStyle(.segmented)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Lyrics Font Style:").bold()
+                        Picker("", selection: $lyricsFont) {
+                            Text("Rounded").tag("rounded")
+                            Text("Standard").tag("default")
+                            Text("Serif").tag("serif")
+                            Text("Monospaced").tag("monospaced")
+                        }
+                        .pickerStyle(.segmented)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Lyrics Color:").bold()
+                        Picker("", selection: $lyricsColor) {
+                            Text("White").tag("white")
+                            Text("Dynamic (Album Art)").tag("dynamic")
+                            Text("Yellow").tag("yellow")
+                            Text("Pink").tag("pink")
+                        }
+                        .pickerStyle(.segmented)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Lyrics Animation:").bold()
+                        Picker("", selection: $lyricsAnimation) {
+                            Text("Slide").tag("slide")
+                            Text("Scale").tag("scale")
+                            Text("Blur").tag("blur")
+                            Text("3D Flip").tag("3d")
+                            Text("Random / Song").tag("randomPerSong")
+                            Text("Random / Line").tag("randomPerLine")
+                        }
+                        .pickerStyle(.menu)
                     }
                     
                     Divider()

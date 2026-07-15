@@ -80,29 +80,37 @@ final class YtDlpService: ObservableObject {
 
     /// Searches YouTube for the given query string and returns track metadata.
     /// If the query starts with "http", it is treated as a direct URL.
-    func search(query: String) async throws -> TrackInfo {
+    func search(query: String) async throws -> [TrackInfo] {
         await ensureBinary()
         let effectiveQuery = query.lowercased().hasPrefix("http") ? query : "ytsearch1:\(query)"
 
         let output = try await runYtDlp(arguments: [
             "--no-warnings",
+            "--playlist-end", "10",
             "--extractor-args", "youtube:player_client=android",
             "--print", "%(title)s\t%(id)s\t%(webpage_url)s\t%(uploader)s",
             effectiveQuery
         ])
 
-        let line = output.trimmingCharacters(in: .whitespacesAndNewlines)
-        let parts = line.components(separatedBy: "\t")
-        guard parts.count >= 4 else {
-            throw YtDlpError.parseError("Unexpected output format: \(line)")
+        let lines = output.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        var tracks: [TrackInfo] = []
+        for line in lines {
+            let parts = line.components(separatedBy: "\t")
+            if parts.count >= 4 {
+                tracks.append(TrackInfo(
+                    title: parts[0],
+                    videoId: parts[1],
+                    url: parts[2],
+                    artist: parts[3]
+                ))
+            }
+        }
+        
+        if tracks.isEmpty {
+            throw YtDlpError.parseError("Unexpected output format or no results")
         }
 
-        return TrackInfo(
-            title: parts[0],
-            videoId: parts[1],
-            url: parts[2],
-            artist: parts[3]
-        )
+        return tracks
     }
 
     // MARK: - Download Audio
@@ -129,6 +137,7 @@ final class YtDlpService: ObservableObject {
 
         _ = try await runYtDlp(arguments: [
             "--no-warnings",
+            "--no-playlist",
             "--extractor-args", "youtube:player_client=android",
             "-x",
             "--audio-format", "mp3",

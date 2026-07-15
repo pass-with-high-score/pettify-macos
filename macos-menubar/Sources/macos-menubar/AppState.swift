@@ -216,14 +216,14 @@ class AppState: ObservableObject {
         status.searchStatus = "Searching..."
         Task {
             do {
-                let trackInfo = try await ytdlp.search(query: query)
-                tracks.append(trackInfo)
-                status.searchStatus = "Downloading audio..."
-                let _ = try await ytdlp.downloadAudio(from: trackInfo.url)
+                let fetchedTracks = try await ytdlp.search(query: query)
+                let startIndex = tracks.count
+                tracks.append(contentsOf: fetchedTracks)
+                
                 status.searchStatus = ""
-                // If nothing playing, play immediately
+                // If nothing playing, play immediately starting from the newly added tracks
                 if currentTrackIndex < 0 || !audioPlayer.isPlaying {
-                    currentTrackIndex = tracks.count - 1
+                    currentTrackIndex = startIndex
                     await playCurrentTrack()
                 }
             } catch {

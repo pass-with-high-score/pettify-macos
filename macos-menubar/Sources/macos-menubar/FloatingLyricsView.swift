@@ -82,6 +82,10 @@ struct FloatingLyricsView: View {
     @State private var isHovering = false
     @AppStorage("floatingOpacity") private var floatingOpacity = 1.0
     @AppStorage("floatingFontSize") private var floatingFontSize = 36.0
+    @AppStorage("lyricsAnimation") private var lyricsAnimation = "slide"
+    @AppStorage("lyricsFont") private var lyricsFont = "rounded"
+    @AppStorage("lyricsColor") private var lyricsColor = "white"
+    @State private var currentSongAnimation: String = "slide"
 
     var alignment: Alignment {
         switch (state.isTop, state.isLeft) {
@@ -129,6 +133,10 @@ struct FloatingLyricsView: View {
             }
             return true
         }
+        .onChange(of: state.status.title) { _ in
+            let options = ["slide", "scale", "blur", "3d"]
+            currentSongAnimation = options.randomElement() ?? "slide"
+        }
     }
     
     @ViewBuilder
@@ -144,24 +152,70 @@ struct FloatingLyricsView: View {
         }
     }
     
+    private func applyFont(to text: Text, baseSize: Double, distance: Int) -> Text {
+        let size = distance == 0 ? baseSize : max(16.0, baseSize * 0.66)
+        let weight: Font.Weight = distance == 0 ? .black : .semibold
+        let design: Font.Design
+        switch lyricsFont {
+        case "default": design = .default
+        case "serif": design = .serif
+        case "monospaced": design = .monospaced
+        case "rounded": fallthrough
+        default: design = .rounded
+        }
+        return text.font(.system(size: size, weight: weight, design: design))
+    }
+    
+    private var primaryColor: Color {
+        switch lyricsColor {
+        case "dynamic": return state.dominantColor
+        case "yellow": return .yellow
+        case "pink": return .pink
+        case "white": fallthrough
+        default: return .white
+        }
+    }
+
+    private func getTransition(for offset: Int, index: Int) -> AnyTransition {
+        let animType: String
+        if lyricsAnimation == "randomPerLine" {
+            let options = ["slide", "scale", "blur", "3d"]
+            animType = options[(index * 7) % options.count]
+        } else if lyricsAnimation == "randomPerSong" {
+            animType = currentSongAnimation
+        } else {
+            animType = lyricsAnimation
+        }
+        
+        switch animType {
+        case "scale":
+            return .opacity.combined(with: .scale(scale: offset < 0 ? 1.2 : 0.8))
+        case "blur":
+            return .opacity // the blur modifier handles the blur effect, transition is just opacity
+        case "3d":
+            return .opacity.combined(with: .modifier(active: RotationModifier(angle: offset < 0 ? -90 : 90), identity: RotationModifier(angle: 0)))
+        case "slide": fallthrough
+        default:
+            return .opacity.combined(with: .move(edge: offset < 0 ? .top : .bottom))
+        }
+    }
+
     @ViewBuilder
     func lyricLine(offset: Int) -> some View {
         let i = state.currentLyricIndex + offset
         if i >= 0 && i < state.lyrics.count {
             let distance = abs(offset)
             let baseSize = floatingFontSize
-            let secondarySize = max(16.0, baseSize * 0.66)
             
-            Text(state.lyrics[i].text)
-                .font(.system(size: distance == 0 ? baseSize : secondarySize, weight: distance == 0 ? .black : .semibold, design: .rounded))
-                .foregroundColor(.white)
+            applyFont(to: Text(state.lyrics[i].text), baseSize: baseSize, distance: distance)
+                .foregroundColor(primaryColor)
                 .opacity(distance == 0 ? 1.0 : (distance == 1 ? 0.4 : 0.1))
-                .shadow(color: distance == 0 ? state.dominantColor.opacity(0.8) : .black.opacity(0.5), radius: distance == 0 ? 10 : 2, x: 0, y: distance == 0 ? 0 : 2)
+                .shadow(color: distance == 0 ? (lyricsColor == "dynamic" ? .black.opacity(0.8) : state.dominantColor.opacity(0.8)) : .black.opacity(0.5), radius: distance == 0 ? 10 : 2, x: 0, y: distance == 0 ? 0 : 2)
                 .blur(radius: distance == 0 ? 0 : CGFloat(distance) * 1.5)
                 .multilineTextAlignment(state.isLeft ? .leading : .trailing)
                 .lineLimit(distance == 0 ? 2 : 1)
                 .id(state.lyrics[i].id)
-                .transition(.opacity.combined(with: .move(edge: offset < 0 ? .top : .bottom)))
+                .transition(getTransition(for: offset, index: i))
         }
     }
     
@@ -378,5 +432,12 @@ struct MarqueeText: View {
                 }
             }
         }
+    }
+}
+
+struct RotationModifier: ViewModifier {
+    let angle: Double
+    func body(content: Content) -> some View {
+        content.rotation3DEffect(.degrees(angle), axis: (x: 1, y: 0, z: 0))
     }
 }
