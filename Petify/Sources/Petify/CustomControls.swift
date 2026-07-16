@@ -5,19 +5,20 @@ import MediaPlayer
 struct CustomSlider: View {
     @Binding var value: Double
     var total: Double
+    var tint: Color = .accentColor
     var onEditingChanged: () -> Void = {}
-    
+
     @State private var isDragging = false
     @State private var dragValue: Double?
     @State private var isHovering = false
-    
+
     var body: some View {
         GeometryReader { geo in
             let displayValue = isDragging ? (dragValue ?? value) : value
             let percent = max(0, min(1, total > 0 ? displayValue / total : 0))
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.primary.opacity(0.2)).frame(height: 4)
-                Capsule().fill(Color.accentColor).frame(width: geo.size.width * CGFloat(percent), height: 4)
+                Capsule().fill(tint).frame(width: geo.size.width * CGFloat(percent), height: 4)
                 
                 let thumbSize: CGFloat = isDragging || isHovering ? 10 : 8
                 let thumbOffset: CGFloat = isDragging || isHovering ? 5 : 4

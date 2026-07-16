@@ -74,32 +74,8 @@ struct SettingsView: View {
         .frame(width: 600, height: 400)
     }
     
-    // MARK: - Sidebar Item Component
-    struct SidebarItem: View {
-        let title: String
-        let icon: String
-        let isSelected: Bool
-        let action: () -> Void
-        
-        var body: some View {
-            Button(action: action) {
-                HStack {
-                    Image(systemName: icon)
-                        .frame(width: 20)
-                        .foregroundColor(isSelected ? .white : .primary)
-                    Text(title)
-                        .foregroundColor(isSelected ? .white : .primary)
-                    Spacer()
-                }
-                .padding(.vertical, 6)
-                .padding(.horizontal, 10)
-                .background(isSelected ? Color.accentColor : Color.clear)
-                .cornerRadius(6)
-            }
-            .buttonStyle(.plain)
-        }
-    }
-    
+    // Sidebar rows use the shared `SidebarItem` component from DesignSystem.swift.
+
     private var aboutContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack(spacing: 20) {

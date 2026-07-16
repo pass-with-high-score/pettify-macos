@@ -7,15 +7,13 @@ struct MenuBarApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     var body: some Scene {
         WindowGroup {
-            PopoverView(state: appDelegate.state)
-                .frame(minWidth: 350, minHeight: 600)
+            MainWindowView(state: appDelegate.state)
+                .frame(minWidth: 900, minHeight: 600)
                 .onAppear {
                     NSApp.activate(ignoringOtherApps: true)
                 }
         }
         .windowStyle(.hiddenTitleBar)
-        
-        Settings { SettingsView(state: appDelegate.state) }
     }
 }
 

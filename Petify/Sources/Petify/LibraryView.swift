@@ -6,209 +6,155 @@ struct LibraryView: View {
     @State private var selectedTab: String = "history"
     @State private var isScanning: Bool = false
     @State private var searchText: String = ""
-    
+
+    private let columns = [GridItem(.adaptive(minimum: 160, maximum: 200), spacing: DS.Spacing.lg)]
+
     var body: some View {
-        VStack(spacing: 8) {
-            // Search Bar
-            HStack {
-                Image(systemName: "magnifyingglass").foregroundColor(.secondary).font(.caption)
-                TextField("Search in library...", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .font(.caption)
-                if !searchText.isEmpty {
-                    Button(action: { searchText = "" }) {
-                        Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
-                    }.buttonStyle(.plain)
+        VStack(alignment: .leading, spacing: DS.Spacing.lg) {
+            // Title
+            Text("Your Library")
+                .font(.system(size: 26, weight: .bold))
+                .foregroundColor(.white)
+
+            // Tabs + filter
+            HStack(spacing: DS.Spacing.sm) {
+                tabPill(title: "Recent", tab: "history", count: library.history.count)
+                tabPill(title: "Favorites", tab: "favorites", count: library.favorites.count)
+                tabPill(title: "Local", tab: "local", count: library.localFiles.count)
+
+                Spacer()
+
+                if selectedTab == "local" {
+                    scanButton
                 }
+
+                filterField
             }
-            .padding(6)
-            .background(Color.secondary.opacity(0.1))
-            .cornerRadius(6)
-            // Tab Picker
-            HStack(spacing: 0) {
-                tabButton(title: "History", icon: "clock.fill", tab: "history", count: library.history.count)
-                tabButton(title: "Favorites", icon: "heart.fill", tab: "favorites", count: library.favorites.count)
-                tabButton(title: "Local", icon: "folder.fill", tab: "local", count: library.localFiles.count)
-            }
-            .padding(2)
-            .background(Color.secondary.opacity(0.1))
-            .cornerRadius(8)
-            
+
             // Content
             switch selectedTab {
             case "history":
-                trackList(tracks: library.history, emptyMessage: "No recently played tracks", emptyIcon: "clock")
+                grid(tracks: library.history, emptyMessage: "No recently played tracks", emptyIcon: "clock")
             case "favorites":
-                trackList(tracks: library.favorites, emptyMessage: "No favorite tracks yet", emptyIcon: "heart")
+                grid(tracks: library.favorites, emptyMessage: "No favorite tracks yet", emptyIcon: "heart")
             case "local":
-                localMusicContent
+                grid(tracks: library.localFiles, emptyMessage: "Tap 'Scan' to find audio files in ~/Music and ~/Downloads", emptyIcon: "folder")
             default:
                 EmptyView()
             }
         }
+        .padding(DS.Spacing.xl)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
-    
-    private func tabButton(title: String, icon: String, tab: String, count: Int) -> some View {
-        Button(action: { selectedTab = tab }) {
-            VStack(spacing: 2) {
-                HStack(spacing: 4) {
-                    Image(systemName: icon)
-                        .font(.system(size: 10))
-                    Text(title)
-                        .font(.system(size: 11, weight: .medium))
-                }
+
+    // MARK: Tab pill
+    private func tabPill(title: String, tab: String, count: Int) -> some View {
+        let isSelected = selectedTab == tab
+        return Button(action: { selectedTab = tab }) {
+            HStack(spacing: DS.Spacing.xs) {
+                Text(title).font(.system(size: 13, weight: .semibold))
                 if count > 0 {
                     Text("\(count)")
-                        .font(.system(size: 9))
-                        .foregroundColor(selectedTab == tab ? .accentColor : .secondary)
+                        .font(.system(size: 11, weight: .semibold))
+                        .opacity(0.7)
                 }
             }
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, DS.Spacing.md)
             .padding(.vertical, 6)
-            .background(selectedTab == tab ? Color.accentColor.opacity(0.15) : Color.clear)
-            .foregroundColor(selectedTab == tab ? .accentColor : .secondary)
-            .cornerRadius(6)
+            .background(isSelected ? Color.white : DS.Spotify.cardHover)
+            .foregroundColor(isSelected ? .black : .white)
+            .clipShape(Capsule())
         }
         .buttonStyle(.plain)
     }
-    
-    private func trackList(tracks: [SavedTrack], emptyMessage: String, emptyIcon: String) -> some View {
-        let filtered = tracks.filter { 
-            searchText.isEmpty || 
-            $0.title.localizedCaseInsensitiveContains(searchText) || 
-            $0.artist.localizedCaseInsensitiveContains(searchText) 
+
+    private var filterField: some View {
+        HStack(spacing: DS.Spacing.xs) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 11))
+                .foregroundColor(DS.Spotify.textSecondary)
+            TextField("Filter", text: $searchText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12))
+                .foregroundColor(.white)
+                .frame(width: 120)
+            if !searchText.isEmpty {
+                Button(action: { searchText = "" }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(DS.Spotify.textSecondary)
+                }.buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, DS.Spacing.md)
+        .padding(.vertical, 6)
+        .background(DS.Spotify.field)
+        .clipShape(Capsule())
+    }
+
+    private var scanButton: some View {
+        Button(action: {
+            isScanning = true
+            library.scanLocalMusic { isScanning = false }
+        }) {
+            HStack(spacing: DS.Spacing.xs) {
+                if isScanning {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: "arrow.clockwise").font(.system(size: 11))
+                }
+                Text(isScanning ? "Scanning…" : "Scan")
+                    .font(.system(size: 12, weight: .semibold))
+            }
+            .padding(.horizontal, DS.Spacing.md)
+            .padding(.vertical, 6)
+            .background(DS.Spotify.green)
+            .foregroundColor(.black)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(isScanning)
+    }
+
+    // MARK: Grid
+    private func grid(tracks: [SavedTrack], emptyMessage: String, emptyIcon: String) -> some View {
+        let filtered = tracks.filter {
+            searchText.isEmpty ||
+            $0.title.localizedCaseInsensitiveContains(searchText) ||
+            $0.artist.localizedCaseInsensitiveContains(searchText)
         }
         return Group {
             if filtered.isEmpty {
-                VStack(spacing: 8) {
+                VStack(spacing: DS.Spacing.md) {
                     Image(systemName: emptyIcon)
-                        .font(.system(size: 24))
-                        .foregroundColor(.secondary.opacity(0.5))
+                        .font(.system(size: 40))
+                        .foregroundColor(DS.Spotify.textTertiary)
                     Text(emptyMessage)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 14))
+                        .foregroundColor(DS.Spotify.textSecondary)
+                        .multilineTextAlignment(.center)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.top, DS.Spacing.xxl)
             } else {
-                ScrollView {
-                    VStack(spacing: 2) {
+                ScrollView(showsIndicators: false) {
+                    LazyVGrid(columns: columns, alignment: .leading, spacing: DS.Spacing.lg) {
                         ForEach(filtered) { track in
-                            trackRow(track: track)
+                            AlbumCard(
+                                track: track,
+                                isFavorite: library.isFavorite(id: track.id),
+                                onPlay: { playFromLibrary(track: track) },
+                                onToggleFavorite: { library.toggleFavorite(track) }
+                            )
                         }
                     }
+                    .padding(.vertical, DS.Spacing.sm)
                 }
-                .frame(maxHeight: 180)
+                .frame(maxHeight: .infinity)
             }
         }
     }
-    
-    private func trackRow(track: SavedTrack) -> some View {
-        HStack(spacing: 8) {
-            // Thumbnail
-            if !track.thumbnailURL.isEmpty {
-                if track.thumbnailURL.hasPrefix("file://"), let url = URL(string: track.thumbnailURL), let nsImage = NSImage(contentsOf: url) {
-                    Image(nsImage: nsImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 36, height: 36)
-                        .cornerRadius(6)
-                } else {
-                    AsyncImage(url: URL(string: track.thumbnailURL)) { phase in
-                        if let image = phase.image {
-                            image.resizable().aspectRatio(contentMode: .fill)
-                        } else {
-                            Color.secondary.opacity(0.2)
-                        }
-                    }
-                    .frame(width: 36, height: 36)
-                    .cornerRadius(6)
-                }
-            } else {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.secondary.opacity(0.2))
-                    .frame(width: 36, height: 36)
-                    .overlay(
-                        Image(systemName: track.isLocal ? "music.note" : "play.circle")
-                            .font(.system(size: 14))
-                            .foregroundColor(.secondary)
-                    )
-            }
-            
-            // Title & Artist
-            VStack(alignment: .leading, spacing: 2) {
-                Text(track.title)
-                    .font(.system(size: 12, weight: .medium))
-                    .lineLimit(1)
-                if !track.artist.isEmpty {
-                    Text(track.artist)
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                }
-            }
-            
-            Spacer()
-            
-            // Favorite button
-            Button(action: { library.toggleFavorite(track) }) {
-                Image(systemName: library.isFavorite(id: track.id) ? "heart.fill" : "heart")
-                    .font(.system(size: 12))
-                    .foregroundColor(library.isFavorite(id: track.id) ? .pink : .secondary)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(Color.clear)
-        .cornerRadius(6)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            playFromLibrary(track: track)
-        }
-        .onHover { hovering in
-            if hovering {
-                NSCursor.pointingHand.push()
-            } else {
-                NSCursor.pop()
-            }
-        }
-    }
-    
-    private var localMusicContent: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Spacer()
-                Button(action: {
-                    isScanning = true
-                    library.scanLocalMusic {
-                        isScanning = false
-                    }
-                }) {
-                    HStack(spacing: 4) {
-                        if isScanning {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 11))
-                        }
-                        Text(isScanning ? "Scanning..." : "Scan Music")
-                            .font(.system(size: 11))
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.accentColor.opacity(0.15))
-                    .cornerRadius(6)
-                }
-                .buttonStyle(.plain)
-                .disabled(isScanning)
-            }
-            
-            trackList(tracks: library.localFiles, emptyMessage: "Tap 'Scan Music' to find audio files\nin ~/Music and ~/Downloads", emptyIcon: "folder")
-        }
-    }
-    
+
     private func playFromLibrary(track: SavedTrack) {
         let trackInfo = TrackInfo(
             title: track.title,
@@ -220,5 +166,64 @@ struct LibraryView: View {
         state.tracks.append(trackInfo)
         state.currentTrackIndex = state.tracks.count - 1
         state.playCurrentTrack()
+    }
+}
+
+// MARK: - AlbumCard
+// Spotify-style album tile: cover art with a green play button that fades in on
+// hover, title + artist below, and a heart shown on hover.
+struct AlbumCard: View {
+    let track: SavedTrack
+    let isFavorite: Bool
+    let onPlay: () -> Void
+    let onToggleFavorite: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.sm) {
+            ZStack(alignment: .bottomTrailing) {
+                ArtworkView(thumbnail: track.thumbnailURL, cornerRadius: DS.Radius.md)
+                    .aspectRatio(1, contentMode: .fit)
+                    .shadow(color: .black.opacity(0.4), radius: 8, x: 0, y: 4)
+
+                SpotifyPlayButton(isPaused: true, size: 46, action: onPlay)
+                    .padding(DS.Spacing.sm)
+                    .opacity(isHovering ? 1 : 0)
+                    .offset(y: isHovering ? 0 : 8)
+
+                if isHovering || isFavorite {
+                    Button(action: onToggleFavorite) {
+                        Image(systemName: isFavorite ? "heart.fill" : "heart")
+                            .font(.system(size: 14))
+                            .foregroundColor(isFavorite ? DS.Spotify.green : .white)
+                            .padding(6)
+                            .background(Color.black.opacity(0.45))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(DS.Spacing.sm)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                }
+            }
+
+            Text(track.title)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+
+            Text(track.artist.isEmpty ? (track.isLocal ? "Local file" : "Unknown artist") : track.artist)
+                .font(.system(size: 12))
+                .foregroundColor(DS.Spotify.textSecondary)
+                .lineLimit(1)
+        }
+        .padding(DS.Spacing.md)
+        .background(isHovering ? DS.Spotify.cardHover : DS.Spotify.card)
+        .cornerRadius(DS.Radius.md)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.18)) { isHovering = hovering }
+        }
+        .onTapGesture(count: 2) { onPlay() }
     }
 }
